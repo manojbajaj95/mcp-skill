@@ -131,7 +131,11 @@ def derive_class_name(server_name: str) -> str:
     if not words:
         return "McpApp"
     
-    return ''.join(words) + "App"
+    name = ''.join(words) + "App"
+    # Ensure the name is a valid Python identifier (can't start with a digit)
+    if name and name[0].isdigit():
+        name = "Mcp" + name
+    return name
 
 
 def derive_skill_name(server_name: str) -> str:
