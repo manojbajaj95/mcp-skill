@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-skill"
+version = "0.1.0"
+description = "Convert any MCP server into an Agent Skill"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=2.0",
+    "click>=8.0",
+]
+
+[project.scripts]
+mcp-skill = "mcp_skill.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_skill"]
