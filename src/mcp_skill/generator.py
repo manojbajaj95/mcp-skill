@@ -28,15 +28,6 @@ def _build_method_signature(method_name: str, params: list[dict]) -> str:
     return ", ".join(parts)
 
 
-def _build_call_args(params: list[dict]) -> str:
-    """Build the dict argument for call_tool."""
-    if not params:
-        return "{}"
-    lines = []
-    for p in params:
-        lines.append(f'            "{p["name"]}": {p["name"]},')
-    return "{\n" + "\n".join(lines) + "\n        }"
-
 
 def _build_docstring(description: str, params: list[dict], tags: str, indent: str = "        ") -> str:
     """Build a method docstring."""
@@ -71,7 +62,6 @@ def generate_app_py(class_name: str, server_url: str, tools: list) -> str:
         sig = _build_method_signature(method_name, params)
         tags = _generate_tags(tool.name)
         docstring = _build_docstring(tool.description or "", params, tags)
-        call_args = _build_call_args(params)
 
         # Build call_args dict with 12-space indent (inside async with block)
         call_args_lines = ["            call_args = {}"]
