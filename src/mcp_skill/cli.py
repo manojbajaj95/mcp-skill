@@ -22,7 +22,8 @@ def main():
 @click.option("--api-key", "api_key", help="API key (when auth=api-key)")
 @click.option("--force", is_flag=True, help="Overwrite existing directory")
 @click.option("--non-interactive", is_flag=True, help="Skip interactive prompts")
-def create(url, auth, name, api_key, force, non_interactive):
+@click.option("--app-name", "app_name", default=None, help="App class base name (e.g. 'Fetch' → FetchApp)")
+def create(url, auth, name, api_key, force, non_interactive, app_name):
     """Create an Agent Skill from an MCP server."""
     try:
         # Gather inputs - interactive or from flags
@@ -82,6 +83,14 @@ def create(url, auth, name, api_key, force, non_interactive):
         else:
             name = derive_skill_name(name)
 
+        # Determine app class name
+        if not app_name:
+            if non_interactive:
+                app_name = server_name
+            else:
+                default_app = server_name.capitalize()
+                app_name = click.prompt("App name (base name, 'App' suffix added automatically)", default=default_app)
+
         # Check if directory exists
         if os.path.exists(name):
             if not force:
@@ -93,14 +102,14 @@ def create(url, auth, name, api_key, force, non_interactive):
                     sys.exit(0)
 
         # Generate class name and description
-        class_name = derive_class_name(server_name)
+        class_name = derive_class_name(app_name)
         description = generate_skill_description(server_name, tools)
 
         click.echo("Generating skill...")
 
         # Generate code
         app_code = generate_app_py(class_name, url, tools)
-        skill_md = generate_skill_md(name, description, tools)
+        skill_md = generate_skill_md(name, description, tools, class_name)
 
         # Write output files
         os.makedirs(os.path.join(name, "scripts"), exist_ok=True)

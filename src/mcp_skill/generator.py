@@ -73,31 +73,32 @@ def generate_app_py(class_name: str, server_url: str, tools: list) -> str:
         docstring = _build_docstring(tool.description or "", params, tags)
         call_args = _build_call_args(params)
 
-        # Build call_args dict, filtering out None values for optional params
-        call_args_lines = ["        call_args = {}"]
+        # Build call_args dict with 12-space indent (inside async with block)
+        call_args_lines = ["            call_args = {}"]
         for p in params:
             param_name = p["name"]
             if p["required"]:
-                call_args_lines.append(f'        call_args["{param_name}"] = {param_name}')
+                call_args_lines.append(f'            call_args["{param_name}"] = {param_name}')
             else:
-                call_args_lines.append(f'        if {param_name} is not None: call_args["{param_name}"] = {param_name}')
+                call_args_lines.append(f'            if {param_name} is not None: call_args["{param_name}"] = {param_name}')
 
         method_lines = [
             f"    async def {method_name}({sig}) -> dict[str, Any]:",
             docstring,
+            "        async with self._get_client() as client:",
         ]
         method_lines.extend(call_args_lines)
         method_lines.extend([
-            f'        result = await self._client.call_tool("{tool.name}", call_args)',
-            "        texts = []",
-            "        for block in result.content:",
-            '            if hasattr(block, "text"):',
-            "                texts.append(block.text)",
-            '        text = "\\n".join(texts)',
-            "        try:",
-            "            return json.loads(text)",
-            "        except (json.JSONDecodeError, TypeError):",
-            '            return {"result": text}',
+            f'            result = await client.call_tool("{tool.name}", call_args)',
+            "            texts = []",
+            "            for block in result.content:",
+            '                if hasattr(block, "text"):', 
+            "                    texts.append(block.text)",
+            '            text = "\\n".join(texts)',
+            "            try:",
+            "                return json.loads(text)",
+            "            except (json.JSONDecodeError, TypeError):",
+            '                return {"result": text}',
         ])
         methods.append("\n".join(method_lines))
 
@@ -131,20 +132,11 @@ def generate_app_py(class_name: str, server_url: str, tools: list) -> str:
         f'    def __init__(self, url: str = "{server_url}", auth: str | None = None) -> None:',
         "        self.url = url",
         "        self.auth = auth",
-        "        self._client: Client | None = None",
         "",
-        "    async def __aenter__(self):",
-        '        if self.auth and self.auth.lower() not in ("none", ""):',
-        "            self._client = Client(self.url, auth=self.auth)",
-        "        else:",
-        "            self._client = Client(self.url)",
-        "        await self._client.__aenter__()",
-        "        return self",
-        "",
-        "    async def __aexit__(self, *args):",
-        "        if self._client:",
-        "            await self._client.__aexit__(*args)",
-        "        self._client = None",
+        "    def _get_client(self) -> Client:",
+        '        if self.auth and self.auth.lower() not in ("none", ""):', 
+        "            return Client(self.url, auth=self.auth)",
+        "        return Client(self.url)",
         "",
     ]
 
@@ -165,7 +157,7 @@ def generate_app_py(class_name: str, server_url: str, tools: list) -> str:
     return code
 
 
-def generate_skill_md(skill_name: str, description: str, tools: list) -> str:
+def generate_skill_md(skill_name: str, description: str, tools: list, class_name: str = "App") -> str:
     """Generate SKILL.md content."""
     from mcp_skill.type_mapper import schema_to_python_type
 
@@ -188,12 +180,11 @@ def generate_skill_md(skill_name: str, description: str, tools: list) -> str:
     lines.append("## Quick Start")
     lines.append("")
     lines.append("```python")
-    lines.append("from scripts.app import *")
+    lines.append(f"from scripts.app import {class_name}")
     lines.append("")
-    lines.append("# Use as async context manager")
-    lines.append("async with App() as app:")
-    lines.append("    tools = app.list_tools()")
-    lines.append("    # Call any tool method")
+    lines.append(f"app = {class_name}()")
+    lines.append("tools = app.list_tools()")
+    lines.append("# Call any tool method")
     lines.append("```")
     lines.append("")
 
