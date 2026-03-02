@@ -73,12 +73,24 @@ def generate_app_py(class_name: str, server_url: str, tools: list) -> str:
         docstring = _build_docstring(tool.description or "", params, tags)
         call_args = _build_call_args(params)
 
+        # Build call_args dict, filtering out None values for optional params
+        call_args_lines = ["        call_args = {}"]
+        for p in params:
+            param_name = p["name"]
+            if p["required"]:
+                call_args_lines.append(f'        call_args["{param_name}"] = {param_name}')
+            else:
+                call_args_lines.append(f'        if {param_name} is not None: call_args["{param_name}"] = {param_name}')
+
         method_lines = [
             f"    async def {method_name}({sig}) -> dict[str, Any]:",
             docstring,
-            f'        result = await self._client.call_tool("{tool.name}", {call_args})',
+        ]
+        method_lines.extend(call_args_lines)
+        method_lines.extend([
+            f'        result = await self._client.call_tool("{tool.name}", call_args)',
             "        texts = []",
-            "        for block in result:",
+            "        for block in result.content:",
             '            if hasattr(block, "text"):',
             "                texts.append(block.text)",
             '        text = "\\n".join(texts)',
@@ -86,7 +98,7 @@ def generate_app_py(class_name: str, server_url: str, tools: list) -> str:
             "            return json.loads(text)",
             "        except (json.JSONDecodeError, TypeError):",
             '            return {"result": text}',
-        ]
+        ])
         methods.append("\n".join(method_lines))
 
     if method_names:
