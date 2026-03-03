@@ -1,14 +1,22 @@
 """MCP server connection and tool discovery."""
 import asyncio
 from fastmcp import Client
+from fastmcp.client.transports import StreamableHttpTransport
 
 
-async def connect_and_list_tools(url: str, auth: str | None = None) -> tuple[str, list]:
+async def connect_and_list_tools(
+    url: str,
+    auth: str | None = None,
+    headers: dict[str, str] | None = None,
+) -> tuple[str, list]:
     """Connect to an MCP server and list its tools.
     
     Args:
         url: MCP server URL (HTTP/HTTPS)
         auth: Authentication - None for no auth, string for Bearer token
+        headers: Custom headers dict (e.g. {"x-api-key": "..."}). When
+                 provided, a StreamableHttpTransport is constructed directly
+                 so that headers are sent on every request.
     
     Returns:
         Tuple of (server_name, list_of_tools)
@@ -18,8 +26,10 @@ async def connect_and_list_tools(url: str, auth: str | None = None) -> tuple[str
         RuntimeError: If auth fails or other error
     """
     try:
-        # Build client with optional auth
-        if auth and auth.lower() not in ("none", ""):
+        if headers:
+            transport = StreamableHttpTransport(url=url, headers=headers)
+            client = Client(transport)
+        elif auth and auth.lower() not in ("none", ""):
             client = Client(url, auth=auth)
         else:
             client = Client(url)

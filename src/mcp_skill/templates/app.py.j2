@@ -1,0 +1,105 @@
+"""Application for interacting with {{ base_name }} via MCP."""
+from typing import Any
+from fastmcp import Client
+{% if auth_type in ("bearer", "header") %}
+import httpx
+{% endif %}
+import json
+
+{% if auth_type == "bearer" %}
+
+class _BearerAuth(httpx.Auth):
+    def __init__(self, token: str):
+        self.token = token
+
+    def auth_flow(self, request: httpx.Request):
+        request.headers["Authorization"] = f"Bearer {self.token}"
+        yield request
+
+{% elif auth_type == "header" %}
+
+class _ApiKeyAuth(httpx.Auth):
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def auth_flow(self, request: httpx.Request):
+        request.headers["{{ auth_header }}"] = self.api_key
+        yield request
+
+{% endif %}
+
+class {{ class_name }}:
+    """
+    Application for interacting with {{ base_name }} via MCP.
+    Provides tools to {{ brief }}.
+    """
+
+{% if auth_type in ("bearer", "header") %}
+    def __init__(self, url: str = "{{ server_url }}", api_key: str | None = None) -> None:
+        self.url = url
+{% if auth_type == "bearer" %}
+        self._auth: httpx.Auth | None = _BearerAuth(api_key) if api_key else None
+{% else %}
+        self._auth: httpx.Auth | None = _ApiKeyAuth(api_key) if api_key else None
+{% endif %}
+{% elif auth_type == "oauth" %}
+    def __init__(self, url: str = "{{ server_url }}") -> None:
+        self.url = url
+{% else %}
+    def __init__(self, url: str = "{{ server_url }}") -> None:
+        self.url = url
+{% endif %}
+
+{% if auth_type in ("bearer", "header") %}
+    def _get_client(self) -> Client:
+        return Client(self.url, auth=self._auth)
+{% elif auth_type == "oauth" %}
+    def _get_client(self) -> Client:
+        return Client(self.url, auth="oauth")
+{% else %}
+    def _get_client(self) -> Client:
+        return Client(self.url)
+{% endif %}
+
+{% for method in methods %}
+    async def {{ method.name }}({{ method.signature }}) -> dict[str, Any]:
+        """
+        {{ method.description }}
+
+{% if method.params %}
+        Args:
+{% for p in method.params %}
+            {{ p.name }}: {{ p.doc }}
+{% endfor %}
+
+{% endif %}
+        Returns:
+            Tool execution result
+
+        Tags:
+            {{ method.tags }}
+        """
+        async with self._get_client() as client:
+            call_args = {}
+{% for p in method.params %}
+{% if p.required %}
+            call_args["{{ p.name }}"] = {{ p.name }}
+{% else %}
+            if {{ p.name }} is not None:
+                call_args["{{ p.name }}"] = {{ p.name }}
+{% endif %}
+{% endfor %}
+            result = await client.call_tool("{{ method.tool_name }}", call_args)
+            texts = []
+            for block in result.content:
+                if hasattr(block, "text"):
+                    texts.append(block.text)
+            text = "\n".join(texts)
+            try:
+                return json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                return {"result": text}
+
+{% endfor %}
+    def list_tools(self):
+        return [{{ method_refs }}]

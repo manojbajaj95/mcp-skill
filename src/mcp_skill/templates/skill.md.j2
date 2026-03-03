@@ -1,0 +1,134 @@
+---
+name: {{ skill_name }}
+description: "{{ description | replace('"', '\\"') }}"
+---
+
+# {{ skill_name }}
+
+{{ description }}
+
+## Authentication
+
+{% if auth_type == "none" %}
+No authentication required.
+
+```python
+app = {{ class_name }}()
+```
+{% elif auth_type == "bearer" %}
+This MCP server uses **Bearer token** authentication.
+
+```python
+app = {{ class_name }}(api_key="YOUR_API_KEY")
+```
+
+The key is sent as `Authorization: Bearer <api_key>` on every request.
+{% elif auth_type == "header" %}
+This MCP server uses a custom **`{{ auth_header }}`** header for authentication.
+
+```python
+app = {{ class_name }}(api_key="YOUR_API_KEY")
+```
+
+The key is sent as `{{ auth_header }}: <api_key>` on every request.
+{% elif auth_type == "oauth" %}
+This MCP server uses **OAuth** authentication.
+The OAuth flow is handled automatically by the MCP client.
+
+```python
+app = {{ class_name }}()
+```
+{% endif %}
+
+## Dependencies
+
+This skill requires the following Python packages:
+
+{% for dep in dependencies %}
+- `{{ dep }}`
+{% endfor %}
+
+Install with uv:
+
+```bash
+uv pip install {{ dependencies | join(" ") }}
+```
+
+Or with pip:
+
+```bash
+pip install {{ dependencies | join(" ") }}
+```
+
+## How to Run
+
+This skill is a standalone Python script. Run it from the skill directory (`.agents/skills/{{ skill_name }}/`).
+
+**Preferred: use `uv run`** (handles dependencies automatically):
+
+```bash
+uv run --with {{ dependencies | join(" --with ") }} python -c "
+import asyncio
+from scripts.app import {{ class_name }}
+
+async def main():
+{% if auth_type in ('bearer', 'header') %}
+    app = {{ class_name }}(api_key='YOUR_API_KEY')
+{% else %}
+    app = {{ class_name }}()
+{% endif %}
+    result = await app.{{ tools[0].safe_method if tools else 'list_tools' }}({{ tools[0].example_args if tools else '' }})
+    print(result)
+
+asyncio.run(main())
+"
+```
+
+**Alternative: use `python` directly** (install dependencies first):
+
+```bash
+pip install {{ dependencies | join(" ") }}
+python -c "
+import asyncio
+from scripts.app import {{ class_name }}
+
+async def main():
+{% if auth_type in ('bearer', 'header') %}
+    app = {{ class_name }}(api_key='YOUR_API_KEY')
+{% else %}
+    app = {{ class_name }}()
+{% endif %}
+    result = await app.{{ tools[0].safe_method if tools else 'list_tools' }}({{ tools[0].example_args if tools else '' }})
+    print(result)
+
+asyncio.run(main())
+"
+```
+
+{% if tools %}
+## Available Tools
+
+{% for tool in tools %}
+### {{ tool.name }}
+
+{{ tool.description or "No description available." }}
+
+{% if tool.params %}
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+{% for p in tool.params %}
+| {{ p.name }} | `{{ p.type }}` | {{ "Yes" if p.required else "No" }} | {{ p.description }} |
+{% endfor %}
+
+{% endif %}
+**Example:**
+```python
+result = await app.{{ tool.safe_method }}({{ tool.example_args }})
+```
+
+{% endfor %}
+{% else %}
+## Available Tools
+
+No tools available.
+{% endif %}
