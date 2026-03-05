@@ -5,6 +5,9 @@ from fastmcp import Client
 import httpx
 {% endif %}
 import json
+{% if auth_type == "none" %}
+import warnings
+{% endif %}
 
 {% if auth_type == "bearer" %}
 
@@ -35,19 +38,26 @@ class {{ class_name }}:
     """
 
 {% if auth_type in ("bearer", "header") %}
-    def __init__(self, url: str = "{{ server_url }}", api_key: str | None = None) -> None:
+    def __init__(self, url: str = "{{ server_url }}", auth=None) -> None:
         self.url = url
 {% if auth_type == "bearer" %}
-        self._auth: httpx.Auth | None = _BearerAuth(api_key) if api_key else None
+        self._auth: httpx.Auth | None = _BearerAuth(auth) if auth else None
 {% else %}
-        self._auth: httpx.Auth | None = _ApiKeyAuth(api_key) if api_key else None
+        self._auth: httpx.Auth | None = _ApiKeyAuth(auth) if auth else None
 {% endif %}
 {% elif auth_type == "oauth" %}
-    def __init__(self, url: str = "{{ server_url }}") -> None:
+    def __init__(self, url: str = "{{ server_url }}", auth=None) -> None:
         self.url = url
+        self.auth = auth or "oauth"
 {% else %}
-    def __init__(self, url: str = "{{ server_url }}") -> None:
+    def __init__(self, url: str = "{{ server_url }}", auth=None) -> None:
         self.url = url
+        if auth is not None:
+            warnings.warn(
+                "This server requires no authentication; the 'auth' argument will be ignored.",
+                UserWarning,
+                stacklevel=2,
+            )
 {% endif %}
 
 {% if auth_type in ("bearer", "header") %}
@@ -55,7 +65,7 @@ class {{ class_name }}:
         return Client(self.url, auth=self._auth)
 {% elif auth_type == "oauth" %}
     def _get_client(self) -> Client:
-        return Client(self.url, auth="oauth")
+        return Client(self.url, auth=self.auth)
 {% else %}
     def _get_client(self) -> Client:
         return Client(self.url)

@@ -15,28 +15,36 @@ No authentication required.
 ```python
 app = {{ class_name }}()
 ```
+
+Passing an `auth` argument is accepted but has no effect and will emit a warning.
 {% elif auth_type == "bearer" %}
 This MCP server uses **Bearer token** authentication.
 
 ```python
-app = {{ class_name }}(api_key="YOUR_API_KEY")
+app = {{ class_name }}(auth="YOUR_API_KEY")
 ```
 
-The key is sent as `Authorization: Bearer <api_key>` on every request.
+The key is sent as `Authorization: Bearer <auth>` on every request.
 {% elif auth_type == "header" %}
 This MCP server uses a custom **`{{ auth_header }}`** header for authentication.
 
 ```python
-app = {{ class_name }}(api_key="YOUR_API_KEY")
+app = {{ class_name }}(auth="YOUR_API_KEY")
 ```
 
-The key is sent as `{{ auth_header }}: <api_key>` on every request.
+The key is sent as `{{ auth_header }}: <auth>` on every request.
 {% elif auth_type == "oauth" %}
 This MCP server uses **OAuth** authentication.
-The OAuth flow is handled automatically by the MCP client.
+The OAuth flow is handled automatically by the MCP client by default.
 
 ```python
-app = {{ class_name }}()
+app = {{ class_name }}()  # uses default OAuth flow
+```
+
+To bring your own OAuth provider, pass it via the `auth` argument:
+
+```python
+app = {{ class_name }}(auth=my_oauth_provider)
 ```
 {% endif %}
 
@@ -73,7 +81,7 @@ from scripts.app import {{ class_name }}
 
 async def main():
 {% if auth_type in ('bearer', 'header') %}
-    app = {{ class_name }}(api_key='YOUR_API_KEY')
+    app = {{ class_name }}(auth='YOUR_API_KEY')
 {% else %}
     app = {{ class_name }}()
 {% endif %}
@@ -94,7 +102,7 @@ from scripts.app import {{ class_name }}
 
 async def main():
 {% if auth_type in ('bearer', 'header') %}
-    app = {{ class_name }}(api_key='YOUR_API_KEY')
+    app = {{ class_name }}(auth='YOUR_API_KEY')
 {% else %}
     app = {{ class_name }}()
 {% endif %}
