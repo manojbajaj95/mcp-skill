@@ -130,19 +130,18 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
             auth_type=auth_type, auth_header=auth_header,
         )
 
-        scripts_dir = os.path.join(output_dir, "scripts")
-        os.makedirs(scripts_dir, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
 
-        with open(os.path.join(scripts_dir, "__init__.py"), "w") as f:
+        with open(os.path.join(output_dir, "__init__.py"), "w") as f:
             f.write("")
 
-        with open(os.path.join(scripts_dir, "app.py"), "w") as f:
+        with open(os.path.join(output_dir, "app.py"), "w") as f:
             f.write(app_code)
 
         with open(os.path.join(output_dir, "SKILL.md"), "w") as f:
             f.write(skill_md)
 
-        app_py_path = Path(scripts_dir) / "app.py"
+        app_py_path = Path(output_dir) / "app.py"
         click.echo("Validating generated code...")
         report = validate_generated_code(app_py_path)
         click.echo(report.summary())
@@ -151,7 +150,7 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
             click.echo("\nWarning: Validation found issues. The skill was still generated but may need fixes.", err=True)
 
         click.echo(f"\nSkill generated at ./{output_dir}/")
-        click.echo(f"  {output_dir}/scripts/app.py")
+        click.echo(f"  {output_dir}/app.py")
         click.echo(f"  {output_dir}/SKILL.md")
 
     except Exception as e:

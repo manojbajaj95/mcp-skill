@@ -84,14 +84,26 @@ pip install {{ dependencies | join(" ") }}
 
 ## How to Run
 
-This skill is a standalone Python script. Run it from the skill directory (`.agents/skills/{{ skill_name }}/`).
+**Important:** Add `.agents/skills` to your Python path so imports resolve correctly:
+
+```python
+import sys
+sys.path.insert(0, ".agents/skills")
+from {{ skill_name }}.app import {{ class_name }}
+```
+
+Or set the `PYTHONPATH` environment variable:
+
+```bash
+export PYTHONPATH=".agents/skills:$PYTHONPATH"
+```
 
 **Preferred: use `uv run`** (handles dependencies automatically):
 
 ```bash
-uv run --with {{ dependencies | join(" --with ") }} python -c "
+PYTHONPATH=.agents/skills uv run --with {{ dependencies | join(" --with ") }} python -c "
 import asyncio
-from scripts.app import {{ class_name }}
+from {{ skill_name }}.app import {{ class_name }}
 
 async def main():
 {% if auth_type in ('bearer', 'header') %}
@@ -110,9 +122,9 @@ asyncio.run(main())
 
 ```bash
 pip install {{ dependencies | join(" ") }}
-python -c "
+PYTHONPATH=.agents/skills python -c "
 import asyncio
-from scripts.app import {{ class_name }}
+from {{ skill_name }}.app import {{ class_name }}
 
 async def main():
 {% if auth_type in ('bearer', 'header') %}
