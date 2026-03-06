@@ -1,0 +1,1478 @@
+{
+  "info": {
+    "id": "ses_33d0f7259ffePVLucZmTJdlaj5",
+    "slug": "crisp-sailor",
+    "projectID": "afcecd9f045a08c17a48bfd3973ac5b2d18a9ff3",
+    "directory": "/home/mbajaj/src/personal/mcp-skill",
+    "title": "README.md updates for mcp-skill",
+    "version": "1.2.20",
+    "summary": {
+      "additions": 108,
+      "deletions": 29,
+      "files": 1
+    },
+    "time": {
+      "created": 1772797070759,
+      "updated": 1772797220357
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1772797070876
+        },
+        "summary": {
+          "diffs": [
+            {
+              "file": "README.md",
+              "before": "\n# mcp-skill\n\nConvert any MCP server into a standalone Python skill for programmatic tool calling.\n\n**Input:** MCP server URL, auth type (API key, OAuth, none)\n**Output:** A self-contained skill directory with `app.py` (typed Python class) and `SKILL.md` (agent-facing docs)\n\n## Motivation\n\nMCP servers are great for giving AI agents access to tools, but every tool call requires a round-trip through the model — the agent asks for a tool, the framework executes it, the full result goes back into context, and the agent decides what to do next. For tools that return large payloads or require many sequential calls, this burns tokens and adds latency.\n\n[Programmatic Tool Calling (PTC)](https://platform.claude.com/cookbook/tool-use-programmatic-tool-calling-ptc) solves this by letting the agent write code that calls tools directly in a code execution environment, without round-tripping through the model for each invocation. The agent can fetch data, filter it, aggregate it, and only surface what matters — all in one code block.\n\n**mcp-skill** enables this pattern by converting any MCP server into a plain Python class. Instead of an MCP protocol bridge, you get a typed `App` class with async methods — one per tool — that an agent can import and call from a script. The generated code handles connection, auth, and response parsing. The agent just writes Python.\n\n```python\nfrom scripts.app import ParallelApp\n\napp = ParallelApp(api_key=\"...\")\nresult = await app.web_search_preview(\n    objective=\"find latest news on topic X\",\n    search_queries=[\"topic X 2026\"]\n)\n# Agent processes result in code — no round-trip back to model\n```\n\n## How It Works\n\n1. Connects to the MCP server using [fastmcp](https://github.com/jlowin/fastmcp)\n2. Introspects all available tools via `list_tools()`\n3. Converts each tool's JSON Schema into Python type annotations\n4. Generates a typed `App` class where each MCP tool becomes an `async` method\n5. Generates `SKILL.md` with tool documentation and usage examples for agents\n\nThe generated class handles auth (Bearer token, custom header, or OAuth) and response parsing (JSON or raw text). Each method creates an MCP client, calls the tool, and returns the result as a Python dict.\n\n## Setup\n\n```bash\n# Install with uv\nuv pip install -e .\n\n# Or use directly\nuv run mcp-skill create --url https://your-mcp-server.com/mcp --auth api-key\n```\n\nUses [uv](https://github.com/astral-sh/uv) to manage Python dependencies. Requires Python 3.10+.\n\n## Usage\n\n```bash\n# Interactive mode — prompts for URL, auth type, etc.\nmcp-skill create\n\n# Non-interactive mode\nmcp-skill create \\\n  --url https://search-mcp.parallel.ai/mcp \\\n  --auth api-key \\\n  --api-key YOUR_KEY \\\n  --name parallel-search \\\n  --non-interactive\n```\n\nThe generated skill lands in `.agents/skills/<name>/` with this structure:\n\n```\n.agents/skills/<name>/\n├── scripts/\n│   ├── __init__.py\n│   └── app.py          # Typed Python class wrapping the MCP server\n└── SKILL.md             # Agent-facing docs, dependencies, and usage instructions\n```\n\n## Current Limitations\n\n- Only supports MCP tools (resources and prompts coming soon)\n- No post-generation validation (doesn't verify the generated skill can actually call the server)\n- Creates a new MCP client connection per method call (no connection reuse)\n\n## Task List\n\nTracked improvements based on real-world usage:\n\n- [x] **Fix output directory path** — Changed from `.agents/skill/<name>` to `.agents/skills/<name>` to match where agent frameworks discover skills\n- [x] **Add dependency info to SKILL.md** — Dependencies are listed in SKILL.md with install commands for both uv and pip\n- [x] **Generate `__init__.py` in `scripts/`** — Init file is now created so imports work reliably\n- [x] **Add agent usage instructions to SKILL.md** — \"How to Run\" section with concrete Bash examples, preferring `uv run` with `--with` flags for automatic dependency handling\n- [x] **Post-generation validation** — Runs `ast.parse` → `ruff check` → `ty check` on generated `app.py` after writing. Falls back to `uvx` if tools aren't installed locally, skips gracefully if unavailable\n- [ ] **Support MCP resources and prompts** — Currently only tools are introspected and generated\n",
+              "after": "# mcp-skill\n\nTurn any MCP server into a typed Python SDK.\n\n> **Compile MCP tools into code.**\n\n`mcp-skill` introspects an MCP server and generates a Python class where each tool becomes a typed async method.\n\n## Before and After\n\n### Before\n\nAgents call MCP tools through the model loop — one round-trip per tool call:\n\n```\nllm.call_tool(\"web_search_preview\", {\"query\": \"...\"})\n# → model decides next step → calls another tool → model decides again → ...\n```\n\n### After\n\nAgents call tools directly in code:\n\n```python\nresult = await app.web_search_preview(\n    objective=\"find latest news\",\n    search_queries=[\"topic X 2026\"]\n)\n# Agent processes result in code — no round-trip back to model\n```\n\n## How It Works\n\n```\n┌─────────────┐      ┌───────────────┐      ┌────────────────────┐\n│  MCP Server  │─────▶│  mcp-skill    │─────▶│  Generated Skill   │\n│  (any URL)   │      │  CLI          │      │                    │\n│              │      │               │      │  app.py            │\n│  Tools:      │      │  1. Connect   │      │  ├─ Typed class    │\n│  - search    │      │  2. Introspec │      │  ├─ Async methods  │\n│  - fetch     │      │  3. Map types │      │  ├─ Auth + storage │\n│  - ...       │      │  4. Generate  │      │  └─ JSON parsing   │\n│              │      │  5. Validate  │      │                    │\n└─────────────┘      └───────────────┘      │  SKILL.md          │\n                                             │  └─ Agent docs     │\n                                             └────────────────────┘\n```\n\n1. Connects to the MCP server using [fastmcp](https://github.com/jlowin/fastmcp)\n2. Introspects all available tools via `list_tools()`\n3. Converts each tool's JSON Schema into Python type annotations\n4. Generates a typed `App` class where each MCP tool becomes an `async` method\n5. Validates the output with `ast.parse` → `ruff` → `ty`\n6. Generates `SKILL.md` with tool documentation and usage examples for agents\n\n## Motivation\n\nMCP servers give agents access to tools, but every tool call round-trips through the model — request tool, execute, full result back into context, decide next step. For large payloads or sequential calls, this burns tokens and adds latency.\n\n[Programmatic Tool Calling](https://platform.claude.com/cookbook/tool-use-programmatic-tool-calling-ptc) fixes this: the agent writes code that calls tools directly, without model round-trips per invocation. Fetch, filter, aggregate — all in one code block.\n\n**mcp-skill** makes this possible by compiling any MCP server into a plain Python class. Each tool becomes a typed async method. The agent just writes Python.\n\n```python\nfrom parallel_search.app import ParallelApp\n\napp = ParallelApp(auth=\"sk-...\")\nresult = await app.web_search_preview(\n    objective=\"find latest news on topic X\",\n    search_queries=[\"topic X 2026\"]\n)\n```\n\n## Setup\n\n```bash\n# Install with uv\nuv pip install -e .\n\n# Or use directly\nuv run mcp-skill create --url https://your-mcp-server.com/mcp --auth api-key\n```\n\nRequires [uv](https://github.com/astral-sh/uv) and Python 3.10+.\n\n## Usage\n\n```bash\n# Interactive mode — prompts for URL, auth type, etc.\nmcp-skill create\n\n# Non-interactive mode\nmcp-skill create \\\n  --url https://search-mcp.parallel.ai/mcp \\\n  --auth api-key \\\n  --api-key YOUR_KEY \\\n  --name parallel-search \\\n  --non-interactive\n```\n\n### Generated Output\n\nThe skill lands in `.agents/skills/<name>/` as a Python package:\n\n```\n.agents/skills/parallel_search/\n├── __init__.py\n├── app.py          # Typed Python class wrapping the MCP server\n└── SKILL.md        # Agent-facing docs, dependencies, and usage\n```\n\nHere's what the generated `app.py` looks like:\n\n```python\nclass ParallelApp:\n\n    def __init__(self, url: str = \"https://...\", auth=None) -> None:\n        ...\n\n    async def web_search_preview(\n        self,\n        objective: str,\n        search_queries: list[str],\n    ) -> dict[str, Any]:\n        \"\"\"Search the web with multiple queries in parallel.\"\"\"\n        ...\n\n    async def fetch_url(\n        self,\n        url: str,\n        max_length: int = None,\n    ) -> dict[str, Any]:\n        \"\"\"Fetch and extract content from a URL.\"\"\"\n        ...\n\n    def list_tools(self):\n        return [self.web_search_preview, self.fetch_url]\n```\n\nEach method connects to the MCP server, calls the underlying tool, and returns parsed JSON. Auth credentials are persisted to disk (`~/.mcp-skill/<name>/`) after first use — provide once, reuse automatically.\n\n## Who Is This For?\n\nDevelopers building:\n\n- **MCP-based agents** that need direct tool access without model round-trips\n- **Automation systems** using MCP tools as programmatic building blocks\n- **Code-execution agents** using [Programmatic Tool Calling](https://platform.claude.com/cookbook/tool-use-programmatic-tool-calling-ptc)\n\n## Current Limitations\n\n- **Auth**: Supports API key (Bearer or custom header), OAuth, and none — no mTLS or complex auth flows\n- **Runtime dependency**: Generated code depends on [fastmcp](https://github.com/jlowin/fastmcp) for MCP client connections\n- **Connection per call**: Each method creates a new MCP client connection (no pooling)\n- **Tools only**: MCP resources and prompts not yet supported\n\n## Task List\n\nTracked improvements based on real-world usage:\n\n- [x] **Fix output directory path** — Changed from `.agents/skill/<name>` to `.agents/skills/<name>`\n- [x] **Add dependency info to SKILL.md** — Dependencies listed with `uv` and `pip` install commands\n- [x] **Generate `__init__.py`** — Skill directory is a proper Python package\n- [x] **Post-generation validation** — `ast.parse` → `ruff check` → `ty check` with `uvx` fallback\n- [x] **Package-style imports** — Moved `app.py` to skill root; import via `from <skill>.app import <Class>`\n- [x] **Persistent token storage** — Disk-backed credential storage at `~/.mcp-skill/<name>/`\n- [x] **Unified auth signature** — All auth types use `auth=None` in `__init__`\n- [x] **Sanitize skill names** — Hyphens/dots converted to underscores for valid Python identifiers\n- [ ] **Support MCP resources and prompts** — Currently only tools are introspected and generated\n",
+              "additions": 108,
+              "deletions": 29,
+              "status": "modified"
+            }
+          ]
+        },
+        "agent": "Sisyphus (Ultraworker)",
+        "model": {
+          "providerID": "anthropic",
+          "modelID": "claude-opus-4-6"
+        },
+        "variant": "max",
+        "id": "REDACTED",
+        "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "[search-mode]\nMAXIMIZE SEARCH EFFORT. Launch multiple background agents IN PARALLEL:\n- explore agents (codebase patterns, file structures, ast-grep)\n- librarian agents (remote repos, official docs, GitHub examples)\nPlus direct tools: Grep, ripgrep (rg), ast-grep (sg)\nNEVER stop at first result - be exhaustive.\n\n---\n\nCheck the git history and based on the changes update the README.md. Also apply the following suggestions. \nBetter hook: # mcp-skill\n\nTurn any MCP server into a typed Python SDK.\n\nmcp-skill introspects an MCP server and generates a Python class where\neach tool becomes a typed async method. \nAdd a before and after. ## Before\n\nAgents call MCP tools through the model loop:\n\nllm.call_tool(\"web_search_preview\", {...})\n\n## After\n\nAgents call tools directly in code:\n\nresult = await app.web_search_preview(...) \nReduce the motivation section slightly.make it crisper. Add a diagram of how it works. Show the generated output.\n\nAdd this after usage.\n\n.agents/skills/parallel-search/\n├── scripts/\n│   └── app.py\n└── SKILL.md\n\nAnd show a snippet from the generated file.\n\nExample:\n\nclass ParallelApp:\n\n    async def web_search_preview(\n        self,\n        objective: str,\n        search_queries: list[str]\n    ) -> dict:\n        ...\n\nThis dramatically increases trust. . Better current limitations: Limited auth support (api key, none or oauth), dependency on fastmcp, We moved to the to-do tasks already. Add a “Who This Is For”\n\nVery important for GitHub discovery.\n\nAdd:\n\n## Who is this for?\n\nDevelopers building:\n\n- MCP-based agents\n- automation systems using MCP tools\n- code-execution agents using Programmatic Tool Calling\n\nThis helps the right people immediately identify. The single biggest improvement you can make\n\nAdd this tagline somewhere:\n\nCompile MCP tools into code.\n\nThat phrase is extremely sticky.\n\nDevelopers remember compilers. ",
+          "id": "prt_cc2f08dbb001sFQgtdt5kIc1Fq",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "REDACTED"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1772797071131,
+          "completed": 1772797079903
+        },
+        "parentID": "REDACTED",
+        "modelID": "claude-opus-4-6",
+        "providerID": "anthropic",
+        "mode": "Sisyphus (Ultraworker)",
+        "agent": "Sisyphus (Ultraworker)",
+        "path": {
+          "cwd": "/home/mbajaj/src/personal/mcp-skill",
+          "root": "/home/mbajaj/src/personal/mcp-skill"
+        },
+        "cost": 0.15614,
+        "tokens": {
+          "total": 23657,
+          "input": 3,
+          "output": 442,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 23212
+          }
+        },
+        "variant": "max",
+        "finish": "tool-calls",
+        "id": "msg_cc2f08f1b001BBwx61e2LB3miv",
+        "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "snapshot": "68fb1dd6bf23792c030e8dbbd457e14bb6dba7b4",
+          "id": "prt_cc2f09a96001yfyGGsB3rDPI7V",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f08f1b001BBwx61e2LB3miv"
+        },
+        {
+          "type": "reasoning",
+          "text": "The user wants me to update the README.md based on git history and apply several specific suggestions. Let me first understand the current state of the codebase and git history, then make the changes.\n\nLet me start by:\n1. Reading the current README.md\n2. Checking git history for recent changes\n3. Understanding the project structure\n\nThis is an implementation task with multiple specific changes. Let me plan this out.",
+          "metadata": {
+            "anthropic": {
+              "signature": "EscECkYICxgCKkBGhTt8sQOi8D3/REDACTED/REDACTED/REDACTED/REDACTED/eq0JXL00MddIejxXaxyUujqjXsIGGb44vOvMZ/YWxkevBPa3sIAZnnci/REDACTED/jrscseUgjXaPFrKDvjnJMyotE/REDACTED/vKXN2HF1sccK/1AP3M5Z7VDc/REDACTED/SMtu/REDACTED"
+            }
+          },
+          "time": {
+            "start": 1772797074072,
+            "end": 1772797076258
+          },
+          "id": "prt_cc2f09a980012MJBw9hGVMcknH",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f08f1b001BBwx61e2LB3miv"
+        },
+        {
+          "type": "text",
+          "text": "I detect **implementation intent** — updating README.md with multiple specific suggestions. Let me first gather context: current README, git history, and project structure.",
+          "time": {
+            "start": 1772797077152,
+            "end": 1772797077152
+          },
+          "id": "prt_cc2f0a323001qNdWSd4rS4ItjI",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f08f1b001BBwx61e2LB3miv"
+        },
+        {
+          "type": "tool",
+          "callID": "REDACTED",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/mbajaj/src/personal/mcp-skill/README.md"
+            },
+            "output": "<path>/home/mbajaj/src/personal/mcp-skill/README.md</path>\n<type>file</type>\n<content>1: \n2: # mcp-skill\n3: \n4: Convert any MCP server into a standalone Python skill for programmatic tool calling.\n5: \n6: **Input:** MCP server URL, auth type (API key, OAuth, none)\n7: **Output:** A self-contained skill directory with `app.py` (typed Python class) and `SKILL.md` (agent-facing docs)\n8: \n9: ## Motivation\n10: \n11: MCP servers are great for giving AI agents access to tools, but every tool call requires a round-trip through the model — the agent asks for a tool, the framework executes it, the full result goes back into context, and the agent decides what to do next. For tools that return large payloads or require many sequential calls, this burns tokens and adds latency.\n12: \n13: [Programmatic Tool Calling (PTC)](https://platform.claude.com/cookbook/tool-use-programmatic-tool-calling-ptc) solves this by letting the agent write code that calls tools directly in a code execution environment, without round-tripping through the model for each invocation. The agent can fetch data, filter it, aggregate it, and only surface what matters — all in one code block.\n14: \n15: **mcp-skill** enables this pattern by converting any MCP server into a plain Python class. Instead of an MCP protocol bridge, you get a typed `App` class with async methods — one per tool — that an agent can import and call from a script. The generated code handles connection, auth, and response parsing. The agent just writes Python.\n16: \n17: ```python\n18: from scripts.app import ParallelApp\n19: \n20: app = ParallelApp(api_key=\"...\")\n21: result = await app.web_search_preview(\n22:     objective=\"find latest news on topic X\",\n23:     search_queries=[\"topic X 2026\"]\n24: )\n25: # Agent processes result in code — no round-trip back to model\n26: ```\n27: \n28: ## How It Works\n29: \n30: 1. Connects to the MCP server using [fastmcp](https://github.com/jlowin/fastmcp)\n31: 2. Introspects all available tools via `list_tools()`\n32: 3. Converts each tool's JSON Schema into Python type annotations\n33: 4. Generates a typed `App` class where each MCP tool becomes an `async` method\n34: 5. Generates `SKILL.md` with tool documentation and usage examples for agents\n35: \n36: The generated class handles auth (Bearer token, custom header, or OAuth) and response parsing (JSON or raw text). Each method creates an MCP client, calls the tool, and returns the result as a Python dict.\n37: \n38: ## Setup\n39: \n40: ```bash\n41: # Install with uv\n42: uv pip install -e .\n43: \n44: # Or use directly\n45: uv run mcp-skill create --url https://your-mcp-server.com/mcp --auth api-key\n46: ```\n47: \n48: Uses [uv](https://github.com/astral-sh/uv) to manage Python dependencies. Requires Python 3.10+.\n49: \n50: ## Usage\n51: \n52: ```bash\n53: # Interactive mode — prompts for URL, auth type, etc.\n54: mcp-skill create\n55: \n56: # Non-interactive mode\n57: mcp-skill create \\\n58:   --url https://search-mcp.parallel.ai/mcp \\\n59:   --auth api-key \\\n60:   --api-key YOUR_KEY \\\n61:   --name parallel-search \\\n62:   --non-interactive\n63: ```\n64: \n65: The generated skill lands in `.agents/skills/<name>/` with this structure:\n66: \n67: ```\n68: .agents/skills/<name>/\n69: ├── scripts/\n70: │   ├── __init__.py\n71: │   └── app.py          # Typed Python class wrapping the MCP server\n72: └── SKILL.md             # Agent-facing docs, dependencies, and usage instructions\n73: ```\n74: \n75: ## Current Limitations\n76: \n77: - Only supports MCP tools (resources and prompts coming soon)\n78: - No post-generation validation (doesn't verify the generated skill can actually call the server)\n79: - Creates a new MCP client connection per method call (no connection reuse)\n80: \n81: ## Task List\n82: \n83: Tracked improvements based on real-world usage:\n84: \n85: - [x] **Fix output directory path** — Changed from `.agents/skill/<name>` to `.agents/skills/<name>` to match where agent frameworks discover skills\n86: - [x] **Add dependency info to SKILL.md** — Dependencies are listed in SKILL.md with install commands for both uv and pip\n87: - [x] **Generate `__init__.py` in `scripts/`** — Init file is now created so imports work reliably\n88: - [x] **Add agent usage instructions to SKILL.md** — \"How to Run\" section with concrete Bash examples, preferring `uv run` with `--with` flags for automatic dependency handling\n89: - [x] **Post-generation validation** — Runs `ast.parse` → `ruff check` → `ty check` on generated `app.py` after writing. Falls back to `uvx` if tools aren't installed locally, skips gracefully if unavailable\n90: - [ ] **Support MCP resources and prompts** — Currently only tools are introspected and generated\n\n(End of file - total 90 lines)\n</content>\n\n[Project README: /home/mbajaj/src/personal/mcp-skill/README.md]\n\n# mcp-skill\n\nConvert any MCP server into a standalone Python skill for programmatic tool calling.\n\n**Input:** MCP server URL, auth type (API key, OAuth, none)\n**Output:** A self-contained skill directory with `app.py` (typed Python class) and `SKILL.md` (agent-facing docs)\n\n## Motivation\n\nMCP servers are great for giving AI agents access to tools, but every tool call requires a round-trip through the model — the agent asks for a tool, the framework executes it, the full result goes back into context, and the agent decides what to do next. For tools that return large payloads or require many sequential calls, this burns tokens and adds latency.\n\n[Programmatic Tool Calling (PTC)](https://platform.claude.com/cookbook/tool-use-programmatic-tool-calling-ptc) solves this by letting the agent write code that calls tools directly in a code execution environment, without round-tripping through the model for each invocation. The agent can fetch data, filter it, aggregate it, and only surface what matters — all in one code block.\n\n**mcp-skill** enables this pattern by converting any MCP server into a plain Python class. Instead of an MCP protocol bridge, you get a typed `App` class with async methods — one per tool — that an agent can import and call from a script. The generated code handles connection, auth, and response parsing. The agent just writes Python.\n\n```python\nfrom scripts.app import ParallelApp\n\napp = ParallelApp(api_key=\"...\")\nresult = await app.web_search_preview(\n    objective=\"find latest news on topic X\",\n    search_queries=[\"topic X 2026\"]\n)\n# Agent processes result in code — no round-trip back to model\n```\n\n## How It Works\n\n1. Connects to the MCP server using [fastmcp](https://github.com/jlowin/fastmcp)\n2. Introspects all available tools via `list_tools()`\n3. Converts each tool's JSON Schema into Python type annotations\n4. Generates a typed `App` class where each MCP tool becomes an `async` method\n5. Generates `SKILL.md` with tool documentation and usage examples for agents\n\nThe generated class handles auth (Bearer token, custom header, or OAuth) and response parsing (JSON or raw text). Each method creates an MCP client, calls the tool, and returns the result as a Python dict.\n\n## Setup\n\n```bash\n# Install with uv\nuv pip install -e .\n\n# Or use directly\nuv run mcp-skill create --url https://your-mcp-server.com/mcp --auth api-key\n```\n\nUses [uv](https://github.com/astral-sh/uv) to manage Python dependencies. Requires Python 3.10+.\n\n## Usage\n\n```bash\n# Interactive mode — prompts for URL, auth type, etc.\nmcp-skill create\n\n# Non-interactive mode\nmcp-skill create \\\n  --url https://search-mcp.parallel.ai/mcp \\\n  --auth api-key \\\n  --api-key YOUR_KEY \\\n  --name parallel-search \\\n  --non-interactive\n```\n\nThe generated skill lands in `.agents/skills/<name>/` with this structure:\n\n```\n.agents/skills/<name>/\n├── scripts/\n│   ├── __init__.py\n│   └── app.py          # Typed Python class wrapping the MCP server\n└── SKILL.md             # Agent-facing docs, dependencies, and usage instructions\n```\n\n## Current Limitations\n\n- Only supports MCP tools (resources and prompts coming soon)\n- No post-generation validation (doesn't verify the generated skill can actually call the server)\n- Creates a new MCP client connection per method call (no connection reuse)\n\n## Task List\n\nTracked improvements based on real-world usage:\n\n- [x] **Fix output directory path** — Changed from `.agents/skill/<name>` to `.agents/skills/<name>` to match where agent frameworks discover skills\n- [x] **Add dependency info to SKILL.md** — Dependencies are listed in SKILL.md with install commands for both uv and pip\n- [x] **Generate `__init__.py` in `scripts/`** — Init file is now created so imports work reliably\n- [x] **Add agent usage instructions to SKILL.md** — \"How to Run\" section with concrete Bash examples, preferring `uv run` with `--with` flags for automatic dependency handling\n- [x] **Post-generation validation** — Runs `ast.parse` → `ruff check` → `ty check` on generated `app.py` after writing. Falls back to `uvx` if tools aren't installed locally, skips gracefully if unavailable\n- [ ] **Support MCP resources and prompts** — Currently only tools are introspected and generated\n",
+            "title": "README.md",
+            "metadata": {
+              "preview": "\n# mcp-skill\n\nConvert any MCP server into a standalone Python skill for programmatic tool calling.\n\n**Input:** MCP server URL, auth type (API key, OAuth, none)\n**Output:** A self-contained skill directory with `app.py` (typed Python class) and `SKILL.md` (agent-facing docs)\n\n## Motivation\n\nMCP servers are great for giving AI agents access to tools, but every tool call requires a round-trip through the model — the agent asks for a tool, the framework executes it, the full result goes back into context, and the agent decides what to do next. For tools that return large payloads or require many sequential calls, this burns tokens and adds latency.\n\n[Programmatic Tool Calling (PTC)](https://platform.claude.com/cookbook/tool-use-programmatic-tool-calling-ptc) solves this by letting the agent write code that calls tools directly in a code execution environment, without round-tripping through the model for each invocation. The agent can fetch data, filter it, aggregate it, and only surface what matters — all in one code block.\n\n**mcp-skill** enables this pattern by converting any MCP server into a plain Python class. Instead of an MCP protocol bridge, you get a typed `App` class with async methods — one per tool — that an agent can import and call from a script. The generated code handles connection, auth, and response parsing. The agent just writes Python.\n\n```python\nfrom scripts.app import ParallelApp\n\napp = ParallelApp(api_key=\"...\")",
+              "truncated": false,
+              "loaded": []
+            },
+            "time": {
+              "start": 1772797077762,
+              "end": 1772797077808
+            }
+          },
+          "id": "prt_cc2f0a6a1001CG584GCivL6Upz",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f08f1b001BBwx61e2LB3miv"
+        },
+        {
+          "type": "tool",
+          "callID": "REDACTED",
+          "tool": "bash",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "export CI=true DEBIAN_FRONTEND=noninteractive GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never HOMEBREW_NO_AUTO_UPDATE=1 GIT_EDITOR=: EDITOR=: VISUAL='' GIT_SEQUENCE_EDITOR=: GIT_MERGE_AUTOEDIT=no GIT_PAGER=cat PAGER=cat npm_config_yes=true PIP_NO_INPUT=1 YARN_ENABLE_IMMUTABLE_INSTALLS=false; git log --oneline -20",
+              "description": "Recent git history",
+              "workdir": "/home/mbajaj/src/personal/mcp-skill"
+            },
+            "output": "afba3b6 fix: sanitize skill name to valid Python identifier for folder and imports\na88774d refactor: move app.py to skill root for package-style imports\n531e402 feat: add persistent disk-backed token storage for all auth types\n99bd4ef feat(templates): unify __init__ signature to use auth=None across all auth types\n516218b feat: fix skill output, add deps/usage to SKILL.md, add post-gen validation\n0102fac refactor(generate): remove dead _build_call_args function and unused call\nc65bb3e fix(generate): use per-method client pattern and user-provided app name\n48e4b56 fix(generate): use result.content for CallToolResult and filter None optional args\n2e7e30c feat(cli): add interactive wizard and non-interactive CLI mode\n5256855 feat(core): add introspector, app.py generator, and SKILL.md generator\n6234fa1 feat(types): add JSON Schema to Python type mapper and name sanitizer\nafcecd9 feat(scaffold): initialize mcp-skill project with UV and pyproject.toml\n",
+            "title": "Recent git history",
+            "metadata": {
+              "output": "afba3b6 fix: sanitize skill name to valid Python identifier for folder and imports\na88774d refactor: move app.py to skill root for package-style imports\n531e402 feat: add persistent disk-backed token storage for all auth types\n99bd4ef feat(templates): unify __init__ signature to use auth=None across all auth types\n516218b feat: fix skill output, add deps/usage to SKILL.md, add post-gen validation\n0102fac refactor(generate): remove dead _build_call_args function and unused call\nc65bb3e fix(generate): use per-method client pattern and user-provided app name\n48e4b56 fix(generate): use result.content for CallToolResult and filter None optional args\n2e7e30c feat(cli): add interactive wizard and non-interactive CLI mode\n5256855 feat(core): add introspector, app.py generator, and SKILL.md generator\n6234fa1 feat(types): add JSON Schema to Python type mapper and name sanitizer\nafcecd9 feat(scaffold): initialize mcp-skill project with UV and pyproject.toml\n",
+              "exit": 0,
+              "description": "Recent git history",
+              "truncated": false
+            },
+            "time": {
+              "start": 1772797078634,
+              "end": 1772797078735
+            }
+          },
+          "id": "prt_cc2f0a906001PZO5QAwRw4sp2e",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f08f1b001BBwx61e2LB3miv"
+        },
+        {
+          "type": "tool",
+          "callID": "toolu_017XjVfu7upNiEENELrsn9BS",
+          "tool": "bash",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "export CI=true DEBIAN_FRONTEND=noninteractive GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never HOMEBREW_NO_AUTO_UPDATE=1 GIT_EDITOR=: EDITOR=: VISUAL='' GIT_SEQUENCE_EDITOR=: GIT_MERGE_AUTOEDIT=no GIT_PAGER=cat PAGER=cat npm_config_yes=true PIP_NO_INPUT=1 YARN_ENABLE_IMMUTABLE_INSTALLS=false; git diff HEAD~5..HEAD --stat",
+              "description": "Recent changes summary",
+              "workdir": "/home/mbajaj/src/personal/mcp-skill"
+            },
+            "output": " README.md                           |   90 +-\n pyproject.toml                      |    4 +\n src/mcp_skill/cli.py                |   71 +-\n src/mcp_skill/generator.py          |  319 +++----\n src/mcp_skill/introspector.py       |   30 +-\n src/mcp_skill/templates/app.py.j2   |  173 ++++\n src/mcp_skill/templates/skill.md.j2 |  168 ++++\n src/mcp_skill/type_mapper.py        |   19 +\n src/mcp_skill/validator.py          |   91 ++\n uv.lock                             | 1676 +++++++++++++++++++++++++++++++++++\n 10 files changed, 2423 insertions(+), 218 deletions(-)\n\n[Category+Skill Reminder]\n\n**Built-in**: playwright, frontend-ui-ux, git-master, dev-browser\n**⚡ YOUR SKILLS (PRIORITY)**: find-skills, vercel-react-best-practices, seo-audit, skill-creator, web-design-guidelines, frontend-design\n\n> User-installed skills OVERRIDE built-in defaults. ALWAYS prefer YOUR SKILLS when domain matches.\n\n```typescript\ntask(category=\"visual-engineering\", load_skills=[\"find-skills\"], run_in_background=true)\n```\n",
+            "title": "Recent changes summary",
+            "metadata": {
+              "output": " README.md                           |   90 +-\n pyproject.toml                      |    4 +\n src/mcp_skill/cli.py                |   71 +-\n src/mcp_skill/generator.py          |  319 +++----\n src/mcp_skill/introspector.py       |   30 +-\n src/mcp_skill/templates/app.py.j2   |  173 ++++\n src/mcp_skill/templates/skill.md.j2 |  168 ++++\n src/mcp_skill/type_mapper.py        |   19 +\n src/mcp_skill/validator.py          |   91 ++\n uv.lock                             | 1676 +++++++++++++++++++++++++++++++++++\n 10 files changed, 2423 insertions(+), 218 deletions(-)\n",
+              "exit": 0,
+              "description": "Recent changes summary",
+              "truncated": false
+            },
+            "time": {
+              "start": 1772797079592,
+              "end": 1772797079622
+            }
+          },
+          "id": "prt_cc2f0ac6d001bmNCxJcKUvOt7L",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f08f1b001BBwx61e2LB3miv"
+        },
+        {
+          "type": "tool",
+          "callID": "toolu_01So83asQiVT5PXf9osXoYkf",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/mbajaj/src/personal/mcp-skill"
+            },
+            "output": "<path>/home/mbajaj/src/personal/mcp-skill</path>\n<type>directory</type>\n<entries>\n.agents/\n.claude/\n.entire/\n.git/\n.opencode/\n.ruff_cache/\n.sisyphus/\n.venv/\npyproject.toml\nREADME.md\nsrc/\nuv.lock\n\n(12 entries)\n</entries>",
+            "title": "",
+            "metadata": {
+              "preview": ".agents/\n.claude/\n.entire/\n.git/\n.opencode/\n.ruff_cache/\n.sisyphus/\n.venv/\npyproject.toml\nREADME.md\nsrc/\nuv.lock",
+              "truncated": false,
+              "loaded": []
+            },
+            "time": {
+              "start": 1772797079841,
+              "end": 1772797079855
+            }
+          },
+          "id": "prt_cc2f0b0360014gKr5hRInXawbI",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f08f1b001BBwx61e2LB3miv"
+        },
+        {
+          "type": "step-finish",
+          "reason": "tool-calls",
+          "snapshot": "68fb1dd6bf23792c030e8dbbd457e14bb6dba7b4",
+          "cost": 0.15614,
+          "tokens": {
+            "total": 23657,
+            "input": 3,
+            "output": 442,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 23212
+            }
+          },
+          "id": "REDACTED",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f08f1b001BBwx61e2LB3miv"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1772797079906,
+          "completed": 1772797086974
+        },
+        "parentID": "REDACTED",
+        "modelID": "claude-opus-4-6",
+        "providerID": "anthropic",
+        "mode": "Sisyphus (Ultraworker)",
+        "agent": "Sisyphus (Ultraworker)",
+        "path": {
+          "cwd": "/home/mbajaj/src/personal/mcp-skill",
+          "root": "/home/mbajaj/src/personal/mcp-skill"
+        },
+        "cost": 0.04684225,
+        "tokens": {
+          "total": 27686,
+          "input": 1,
+          "output": 388,
+          "reasoning": 0,
+          "cache": {
+            "read": 23212,
+            "write": 4085
+          }
+        },
+        "variant": "max",
+        "finish": "tool-calls",
+        "id": "msg_cc2f0b162001E8dBYtzPNtxL3R",
+        "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "snapshot": "68fb1dd6bf23792c030e8dbbd457e14bb6dba7b4",
+          "id": "prt_cc2f0b9ca001bFcREQIptU58DT",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0b162001E8dBYtzPNtxL3R"
+        },
+        {
+          "type": "reasoning",
+          "text": "Let me get more context - the git log details and look at the generated app template to understand the output format.",
+          "metadata": {
+            "anthropic": {
+              "signature": "Ep4CCkYICxgCKkA7DGlkbBg/XrZ/REDACTED/J2VTvzqmvw1oImJ4qYQUYaH4/E7BWFXho5CGqRkA3Pl4CbP6H/REDACTED/REDACTED"
+            }
+          },
+          "time": {
+            "start": 1772797082059,
+            "end": 1772797082879
+          },
+          "id": "prt_cc2f0b9cb001lJkz8QxtwLKW0V",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0b162001E8dBYtzPNtxL3R"
+        },
+        {
+          "type": "text",
+          "text": "Let me get more detail on recent changes and the generated output format to make the README accurate.",
+          "time": {
+            "start": 1772797083732,
+            "end": 1772797083732
+          },
+          "id": "prt_cc2f0bd01001p0Vp6dQrqTVx71",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0b162001E8dBYtzPNtxL3R"
+        },
+        {
+          "type": "tool",
+          "callID": "toolu_01GtN1HaMEvm4yG1rUqEyhxn",
+          "tool": "bash",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "export CI=true DEBIAN_FRONTEND=noninteractive GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never HOMEBREW_NO_AUTO_UPDATE=1 GIT_EDITOR=: EDITOR=: VISUAL='' GIT_SEQUENCE_EDITOR=: GIT_MERGE_AUTOEDIT=no GIT_PAGER=cat PAGER=cat npm_config_yes=true PIP_NO_INPUT=1 YARN_ENABLE_IMMUTABLE_INSTALLS=false; export GIT_PAGER=cat PAGER=cat; git log --format=\"%h %s%n%b\" -5",
+              "description": "Detailed git log with bodies",
+              "workdir": "/home/mbajaj/src/personal/mcp-skill"
+            },
+            "output": "afba3b6 fix: sanitize skill name to valid Python identifier for folder and imports\nSkill names like 'parallel-search' produce folders that can't be imported\nas Python modules. Add derive_module_name() to convert hyphens/dots to\nunderscores, and use the sanitized name for the output directory and\nimport statements in generated code.\n\nEntire-Checkpoint: b1adfe56b011\n\na88774d refactor: move app.py to skill root for package-style imports\nFlatten output from scripts/app.py to <skill>/app.py so each skill is\na proper Python package. Agents set PYTHONPATH=.agents/skills and import\nvia 'from <skill_name>.app import <ClassName>', enabling multiple skills\nin the same script.\n\nEntire-Checkpoint: 7fa7de633f62\n\n531e402 feat: add persistent disk-backed token storage for all auth types\nUse DiskStore from py-key-value-aio[disk] to persist credentials across\nruns instead of requiring them every time. OAuth tokens, Bearer keys,\nand custom header keys are stored under ~/.mcp-skill/<skill-name>/.\n\nFor API key auth, _BearerAuth and _ApiKeyAuth now implement httpx\nasync_auth_flow to transparently load/persist keys via DiskStore —\nprovide the key once, subsequent runs load it from disk automatically.\n\nEntire-Checkpoint: 13c65eb6a821\n\n99bd4ef feat(templates): unify __init__ signature to use auth=None across all auth types\nAll generated app classes now accept a consistent (url, auth=None) signature.\nBearer/header wrap auth in their httpx.Auth class, oauth defaults to \"oauth\",\nand none emits a UserWarning if auth is provided.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n516218b feat: fix skill output, add deps/usage to SKILL.md, add post-gen validation\n- Fix output directory from .agents/skill/ to .agents/skills/ to match\n  where agent frameworks discover skills\n- Add Dependencies and How to Run sections to SKILL.md template with\n  uv run preference and pip fallback\n- Generate __init__.py in scripts/ for reliable imports\n- Add post-generation validation pipeline (ast.parse -> ruff -> ty)\n  with uvx fallback when tools not installed locally\n- Fix ruff E701 in app.py template (one-liner if statements)\n- Move code generation to Jinja2 templates\n- Add auth header support for custom API key headers\n- Rewrite README with PTC motivation and task tracking\n\nEntire-Checkpoint: e83d53f596e5\n\n",
+            "title": "Detailed git log with bodies",
+            "metadata": {
+              "output": "afba3b6 fix: sanitize skill name to valid Python identifier for folder and imports\nSkill names like 'parallel-search' produce folders that can't be imported\nas Python modules. Add derive_module_name() to convert hyphens/dots to\nunderscores, and use the sanitized name for the output directory and\nimport statements in generated code.\n\nEntire-Checkpoint: b1adfe56b011\n\na88774d refactor: move app.py to skill root for package-style imports\nFlatten output from scripts/app.py to <skill>/app.py so each skill is\na proper Python package. Agents set PYTHONPATH=.agents/skills and import\nvia 'from <skill_name>.app import <ClassName>', enabling multiple skills\nin the same script.\n\nEntire-Checkpoint: 7fa7de633f62\n\n531e402 feat: add persistent disk-backed token storage for all auth types\nUse DiskStore from py-key-value-aio[disk] to persist credentials across\nruns instead of requiring them every time. OAuth tokens, Bearer keys,\nand custom header keys are stored under ~/.mcp-skill/<skill-name>/.\n\nFor API key auth, _BearerAuth and _ApiKeyAuth now implement httpx\nasync_auth_flow to transparently load/persist keys via DiskStore —\nprovide the key once, subsequent runs load it from disk automatically.\n\nEntire-Checkpoint: 13c65eb6a821\n\n99bd4ef feat(templates): unify __init__ signature to use auth=None across all auth types\nAll generated app classes now accept a consistent (url, auth=None) signature.\nBearer/header wrap auth in their httpx.Auth class, oauth defaults to \"oauth\",\nand none emits a UserWarning if auth is provided.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n516218b feat: fix skill output, add deps/usage to SKILL.md, add post-gen validation\n- Fix output directory from .agents/skill/ to .agents/skills/ to match\n  where agent frameworks discover skills\n- Add Dependencies and How to Run sections to SKILL.md template with\n  uv run preference and pip fallback\n- Generate __init__.py in scripts/ for reliable imports\n- Add post-generation validation pipeline (ast.parse -> ruff -> ty)\n  with uvx fallback when tools not installed locally\n- Fix ruff E701 in app.py template (one-liner if statements)\n- Move code generation to Jinja2 templates\n- Add auth header support for custom API key headers\n- Rewrite README with PTC motivation and task tracking\n\nEntire-Checkpoint: e83d53f596e5\n\n",
+              "exit": 0,
+              "description": "Detailed git log with bodies",
+              "truncated": false
+            },
+            "time": {
+              "start": 1772797085142,
+              "end": 1772797085172
+            }
+          },
+          "id": "prt_cc2f0c056001w4nno1U4RVRp2r",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0b162001E8dBYtzPNtxL3R"
+        },
+        {
+          "type": "tool",
+          "callID": "toolu_017o6sJgEWJxGsprEZgpVDsn",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/templates/app.py.j2"
+            },
+            "output": "<path>/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/templates/app.py.j2</path>\n<type>file</type>\n<content>1: \"\"\"Application for interacting with {{ base_name }} via MCP.\"\"\"\n2: from typing import Any\n3: from fastmcp import Client\n4: {% if auth_type in (\"bearer\", \"header\") %}\n5: import httpx\n6: {% endif %}\n7: {% if auth_type == \"oauth\" %}\n8: from fastmcp.client.auth import OAuth\n9: {% endif %}\n10: {% if auth_type != \"none\" %}\n11: from pathlib import Path\n12: from key_value.aio.stores.disk import DiskStore\n13: {% endif %}\n14: import json\n15: {% if auth_type == \"none\" %}\n16: import warnings\n17: {% endif %}\n18: \n19: {% if auth_type == \"bearer\" %}\n20: \n21: class _BearerAuth(httpx.Auth):\n22:     \"\"\"Bearer token auth with persistent disk-backed storage.\n23: \n24:     On first use, pass an api_key to persist it. Subsequent instantiations\n25:     without an api_key will load the token from disk automatically.\n26:     \"\"\"\n27: \n28:     def __init__(self, api_key: str | None, token_storage: DiskStore):\n29:         self._api_key = api_key\n30:         self._token_storage = token_storage\n31:         self._resolved_key: str | None = None\n32: \n33:     async def async_auth_flow(self, request: httpx.Request):\n34:         if not self._resolved_key:\n35:             if self._api_key:\n36:                 await self._token_storage.put(key=\"api-key\", value=self._api_key)\n37:                 self._resolved_key = self._api_key\n38:             else:\n39:                 stored = await self._token_storage.get(key=\"api-key\")\n40:                 if stored:\n41:                     self._resolved_key = stored\n42:                 else:\n43:                     raise ValueError(\n44:                         \"No API key provided and none found in storage at \"\n45:                         \"~/.mcp-skill/{{ skill_name }}/api-tokens/. \"\n46:                         \"Pass auth= on first use to persist it.\"\n47:                     )\n48:         request.headers[\"Authorization\"] = f\"Bearer {self._resolved_key}\"\n49:         yield request\n50: \n51: {% elif auth_type == \"header\" %}\n52: \n53: class _ApiKeyAuth(httpx.Auth):\n54:     \"\"\"Custom header auth with persistent disk-backed storage.\n55: \n56:     On first use, pass an api_key to persist it. Subsequent instantiations\n57:     without an api_key will load the token from disk automatically.\n58:     \"\"\"\n59: \n60:     def __init__(self, api_key: str | None, token_storage: DiskStore):\n61:         self._api_key = api_key\n62:         self._token_storage = token_storage\n63:         self._resolved_key: str | None = None\n64: \n65:     async def async_auth_flow(self, request: httpx.Request):\n66:         if not self._resolved_key:\n67:             if self._api_key:\n68:                 await self._token_storage.put(key=\"api-key\", value=self._api_key)\n69:                 self._resolved_key = self._api_key\n70:             else:\n71:                 stored = await self._token_storage.get(key=\"api-key\")\n72:                 if stored:\n73:                     self._resolved_key = stored\n74:                 else:\n75:                     raise ValueError(\n76:                         \"No API key provided and none found in storage at \"\n77:                         \"~/.mcp-skill/{{ skill_name }}/api-tokens/. \"\n78:                         \"Pass auth= on first use to persist it.\"\n79:                     )\n80:         request.headers[\"{{ auth_header }}\"] = self._resolved_key\n81:         yield request\n82: \n83: {% endif %}\n84: \n85: class {{ class_name }}:\n86:     \"\"\"\n87:     Application for interacting with {{ base_name }} via MCP.\n88:     Provides tools to {{ brief }}.\n89:     \"\"\"\n90: \n91: {% if auth_type in (\"bearer\", \"header\") %}\n92:     def __init__(self, url: str = \"{{ server_url }}\", auth=None) -> None:\n93:         self.url = url\n94:         self._token_storage = DiskStore(\n95:             directory=Path.home() / \".mcp-skill\" / \"{{ skill_name }}\" / \"api-tokens\"\n96:         )\n97: {% if auth_type == \"bearer\" %}\n98:         self._auth = _BearerAuth(auth, self._token_storage)\n99: {% else %}\n100:         self._auth = _ApiKeyAuth(auth, self._token_storage)\n101: {% endif %}\n102: {% elif auth_type == \"oauth\" %}\n103:     def __init__(self, url: str = \"{{ server_url }}\", auth=None) -> None:\n104:         self.url = url\n105:         self._token_storage = DiskStore(\n106:             directory=Path.home() / \".mcp-skill\" / \"{{ skill_name }}\" / \"oauth-tokens\"\n107:         )\n108:         self._oauth_auth = auth\n109: {% else %}\n110:     def __init__(self, url: str = \"{{ server_url }}\", auth=None) -> None:\n111:         self.url = url\n112:         if auth is not None:\n113:             warnings.warn(\n114:                 \"This server requires no authentication; the 'auth' argument will be ignored.\",\n115:                 UserWarning,\n116:                 stacklevel=2,\n117:             )\n118: {% endif %}\n119: \n120: {% if auth_type in (\"bearer\", \"header\") %}\n121:     def _get_client(self) -> Client:\n122:         return Client(self.url, auth=self._auth)\n123: {% elif auth_type == \"oauth\" %}\n124:     def _get_client(self) -> Client:\n125:         oauth = self._oauth_auth or OAuth(token_storage=self._token_storage)\n126:         return Client(self.url, auth=oauth)\n127: {% else %}\n128:     def _get_client(self) -> Client:\n129:         return Client(self.url)\n130: {% endif %}\n131: \n132: {% for method in methods %}\n133:     async def {{ method.name }}({{ method.signature }}) -> dict[str, Any]:\n134:         \"\"\"\n135:         {{ method.description }}\n136: \n137: {% if method.params %}\n138:         Args:\n139: {% for p in method.params %}\n140:             {{ p.name }}: {{ p.doc }}\n141: {% endfor %}\n142: \n143: {% endif %}\n144:         Returns:\n145:             Tool execution result\n146: \n147:         Tags:\n148:             {{ method.tags }}\n149:         \"\"\"\n150:         async with self._get_client() as client:\n151:             call_args = {}\n152: {% for p in method.params %}\n153: {% if p.required %}\n154:             call_args[\"{{ p.name }}\"] = {{ p.name }}\n155: {% else %}\n156:             if {{ p.name }} is not None:\n157:                 call_args[\"{{ p.name }}\"] = {{ p.name }}\n158: {% endif %}\n159: {% endfor %}\n160:             result = await client.call_tool(\"{{ method.tool_name }}\", call_args)\n161:             texts = []\n162:             for block in result.content:\n163:                 if hasattr(block, \"text\"):\n164:                     texts.append(block.text)\n165:             text = \"\\n\".join(texts)\n166:             try:\n167:                 return json.loads(text)\n168:             except (json.JSONDecodeError, TypeError):\n169:                 return {\"result\": text}\n170: \n171: {% endfor %}\n172:     def list_tools(self):\n173:         return [{{ method_refs }}]\n\n(End of file - total 173 lines)\n</content>",
+            "title": "src/mcp_skill/templates/app.py.j2",
+            "metadata": {
+              "preview": "\"\"\"Application for interacting with {{ base_name }} via MCP.\"\"\"\nfrom typing import Any\nfrom fastmcp import Client\n{% if auth_type in (\"bearer\", \"header\") %}\nimport httpx\n{% endif %}\n{% if auth_type == \"oauth\" %}\nfrom fastmcp.client.auth import OAuth\n{% endif %}\n{% if auth_type != \"none\" %}\nfrom pathlib import Path\nfrom key_value.aio.stores.disk import DiskStore\n{% endif %}\nimport json\n{% if auth_type == \"none\" %}\nimport warnings\n{% endif %}\n\n{% if auth_type == \"bearer\" %}\n",
+              "truncated": false,
+              "loaded": []
+            },
+            "time": {
+              "start": 1772797085648,
+              "end": 1772797085663
+            }
+          },
+          "id": "prt_cc2f0c5e3001liynY3eAk8VZU6",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0b162001E8dBYtzPNtxL3R"
+        },
+        {
+          "type": "tool",
+          "callID": "REDACTED",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/generator.py"
+            },
+            "output": "<path>/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/generator.py</path>\n<type>file</type>\n<content>1: \"\"\"Code generation for app.py and SKILL.md via Jinja2 templates.\"\"\"\n2: from pathlib import Path\n3: from typing import Any\n4: \n5: from jinja2 import Environment, FileSystemLoader\n6: \n7: from mcp_skill.type_mapper import (\n8:     schema_to_python_type,\n9:     to_python_identifier,\n10:     extract_params,\n11: )\n12: \n13: _TEMPLATE_DIR = Path(__file__).parent / \"templates\"\n14: _env = Environment(\n15:     loader=FileSystemLoader(str(_TEMPLATE_DIR)),\n16:     keep_trailing_newline=True,\n17:     lstrip_blocks=True,\n18:     trim_blocks=True,\n19: )\n20: \n21: \n22: def _generate_tags(tool_name: str) -> str:\n23:     words = tool_name.replace(\"-\", \"_\").split(\"_\")\n24:     skip = {\"get\", \"set\", \"the\", \"a\", \"an\", \"is\", \"to\", \"for\", \"of\", \"in\", \"on\", \"by\"}\n25:     tags = [w.lower() for w in words if w.lower() not in skip and len(w) > 1]\n26:     return \", \".join(tags) if tags else tool_name\n27: \n28: \n29: def _build_method_signature(method_name: str, params: list[dict]) -> str:\n30:     parts = [\"self\"]\n31:     for p in params:\n32:         if p[\"required\"]:\n33:             parts.append(f\"{p['name']}: {p['type']}\")\n34:         else:\n35:             parts.append(f\"{p['name']}: {p['type']} = None\")\n36:     return \", \".join(parts)\n37: \n38: \n39: def _build_example_args(properties: dict[str, Any]) -> str:\n40:     example_args = []\n41:     for pn in list(properties.keys())[:3]:\n42:         ps = properties[pn]\n43:         pt = ps.get(\"type\", \"string\")\n44:         if pt == \"string\":\n45:             example_args.append(f'{pn}=\"example\"')\n46:         elif pt == \"integer\":\n47:             example_args.append(f\"{pn}=1\")\n48:         elif pt == \"number\":\n49:             example_args.append(f\"{pn}=1.0\")\n50:         elif pt == \"boolean\":\n51:             example_args.append(f\"{pn}=True\")\n52:         else:\n53:             example_args.append(f'{pn}=\"value\"')\n54:     return \", \".join(example_args)\n55: \n56: \n57: def _prepare_methods(tools: list) -> tuple[list[dict], str]:\n58:     existing_names: set[str] = set()\n59:     methods = []\n60: \n61:     for tool in tools:\n62:         method_name = to_python_identifier(tool.name, existing_names)\n63:         params = extract_params(tool.inputSchema or {})\n64: \n65:         methods.append({\n66:             \"name\": method_name,\n67:             \"tool_name\": tool.name,\n68:             \"signature\": _build_method_signature(method_name, params),\n69:             \"description\": tool.description or \"Execute this tool.\",\n70:             \"params\": [\n71:                 {\n72:                     \"name\": p[\"name\"],\n73:                     \"type\": p[\"type\"],\n74:                     \"doc\": p.get(\"description\") or \"No description\",\n75:                     \"required\": p[\"required\"],\n76:                 }\n77:                 for p in params\n78:             ],\n79:             \"tags\": _generate_tags(tool.name),\n80:         })\n81: \n82:     method_refs = \", \".join(f\"self.{m['name']}\" for m in methods)\n83:     return methods, method_refs\n84: \n85: \n86: def _prepare_tool_docs(tools: list) -> list[dict]:\n87:     docs = []\n88:     for tool in tools:\n89:         input_schema = tool.inputSchema or {}\n90:         properties = input_schema.get(\"properties\", {})\n91:         required = input_schema.get(\"required\", [])\n92:         safe_method = tool.name.replace(\"-\", \"_\").replace(\".\", \"_\")\n93: \n94:         docs.append({\n95:             \"name\": tool.name,\n96:             \"description\": tool.description or \"No description available.\",\n97:             \"safe_method\": safe_method,\n98:             \"example_args\": _build_example_args(properties),\n99:             \"params\": [\n100:                 {\n101:                     \"name\": pn,\n102:                     \"type\": schema_to_python_type(ps),\n103:                     \"required\": pn in required,\n104:                     \"description\": ps.get(\"description\", \"\"),\n105:                 }\n106:                 for pn, ps in properties.items()\n107:             ],\n108:         })\n109:     return docs\n110: \n111: \n112: def generate_app_py(\n113:     class_name: str,\n114:     server_url: str,\n115:     tools: list,\n116:     auth_type: str = \"none\",\n117:     auth_header: str | None = None,\n118:     skill_name: str | None = None,\n119:     module_name: str | None = None,\n120: ) -> str:\n121:     methods, method_refs = _prepare_methods(tools)\n122: \n123:     if tools:\n124:         tool_summary = \", \".join(t.name for t in tools[:5])\n125:         if len(tools) > 5:\n126:             tool_summary += f\" and {len(tools) - 5} more\"\n127:         brief = f\"interact with tools: {tool_summary}\"\n128:     else:\n129:         brief = \"interact with the MCP server\"\n130: \n131:     template = _env.get_template(\"app.py.j2\")\n132:     code = template.render(\n133:         class_name=class_name,\n134:         base_name=class_name.replace(\"App\", \"\"),\n135:         server_url=server_url,\n136:         auth_type=auth_type,\n137:         auth_header=auth_header,\n138:         skill_name=skill_name,\n139:         module_name=module_name or skill_name,\n140:         brief=brief,\n141:         methods=methods,\n142:         method_refs=method_refs,\n143:     )\n144: \n145:     return code\n146: \n147: \n148: def _compute_dependencies(auth_type: str) -> list[str]:\n149:     deps = [\"fastmcp>=2.0\"]\n150:     if auth_type in (\"bearer\", \"header\"):\n151:         deps.append(\"httpx\")\n152:     if auth_type != \"none\":\n153:         deps.append(\"py-key-value-aio[disk]\")\n154:     return deps\n155: \n156: \n157: def generate_skill_md(\n158:     skill_name: str,\n159:     description: str,\n160:     tools: list,\n161:     class_name: str = \"App\",\n162:     auth_type: str = \"none\",\n163:     auth_header: str | None = None,\n164:     module_name: str | None = None,\n165: ) -> str:\n166:     if len(description) > 1024:\n167:         description = description[:1021] + \"...\"\n168: \n169:     tool_docs = _prepare_tool_docs(tools)\n170:     dependencies = _compute_dependencies(auth_type)\n171: \n172:     template = _env.get_template(\"skill.md.j2\")\n173:     content = template.render(\n174:         skill_name=skill_name,\n175:         module_name=module_name or skill_name,\n176:         description=description,\n177:         class_name=class_name,\n178:         auth_type=auth_type,\n179:         auth_header=auth_header,\n180:         tools=tool_docs,\n181:         dependencies=dependencies,\n182:     )\n183: \n184:     content_lines = content.split(\"\\n\")\n185:     if len(content_lines) > 498:\n186:         content = \"\\n\".join(content_lines[:498])\n187:         content += \"\\n\\n*...additional tools omitted for brevity*\\n\"\n188: \n189:     return content\n\n(End of file - total 189 lines)\n</content>",
+            "title": "src/mcp_skill/generator.py",
+            "metadata": {
+              "preview": "\"\"\"Code generation for app.py and SKILL.md via Jinja2 templates.\"\"\"\nfrom pathlib import Path\nfrom typing import Any\n\nfrom jinja2 import Environment, FileSystemLoader\n\nfrom mcp_skill.type_mapper import (\n    schema_to_python_type,\n    to_python_identifier,\n    extract_params,\n)\n\n_TEMPLATE_DIR = Path(__file__).parent / \"templates\"\n_env = Environment(\n    loader=FileSystemLoader(str(_TEMPLATE_DIR)),\n    keep_trailing_newline=True,\n    lstrip_blocks=True,\n    trim_blocks=True,\n)\n",
+              "truncated": false,
+              "loaded": []
+            },
+            "time": {
+              "start": 1772797086159,
+              "end": 1772797086185
+            }
+          },
+          "id": "prt_cc2f0c7d7001a6bzEEvgNRacLA",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0b162001E8dBYtzPNtxL3R"
+        },
+        {
+          "type": "tool",
+          "callID": "REDACTED",
+          "tool": "glob",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": ".agents/skills/**/*",
+              "path": "/home/mbajaj/src/personal/mcp-skill"
+            },
+            "output": "No files found\n[Agent Usage Reminder]\n\nYou called a search/fetch tool directly without leveraging specialized agents.\n\nRECOMMENDED: Use task with explore/librarian agents for better results:\n\n```\n// Parallel exploration - fire multiple agents simultaneously\ntask(agent=\"explore\", prompt=\"Find all files matching pattern X\")\ntask(agent=\"explore\", prompt=\"Search for implementation of Y\") \ntask(agent=\"librarian\", prompt=\"Lookup documentation for Z\")\n\n// Then continue your work while they run in background\n// System will notify you when each completes\n```\n\nWHY:\n- Agents can perform deeper, more thorough searches\n- Background tasks run in parallel, saving time\n- Specialized agents have domain expertise\n- Reduces context window usage in main session\n\nALWAYS prefer: Multiple parallel task calls > Direct tool calls\n",
+            "title": "",
+            "metadata": {
+              "truncated": false
+            },
+            "time": {
+              "start": 1772797086820,
+              "end": 1772797086875
+            }
+          },
+          "id": "prt_cc2f0c9d20013cXn5PGSER1c83",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0b162001E8dBYtzPNtxL3R"
+        },
+        {
+          "type": "step-finish",
+          "reason": "tool-calls",
+          "snapshot": "68fb1dd6bf23792c030e8dbbd457e14bb6dba7b4",
+          "cost": 0.04684225,
+          "tokens": {
+            "total": 27686,
+            "input": 1,
+            "output": 388,
+            "reasoning": 0,
+            "cache": {
+              "read": 23212,
+              "write": 4085
+            }
+          },
+          "id": "prt_cc2f0cc9d001Q3NaKrfn6m47zJ",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0b162001E8dBYtzPNtxL3R"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1772797086985,
+          "completed": 1772797095932
+        },
+        "parentID": "REDACTED",
+        "modelID": "claude-opus-4-6",
+        "providerID": "anthropic",
+        "mode": "Sisyphus (Ultraworker)",
+        "agent": "Sisyphus (Ultraworker)",
+        "path": {
+          "cwd": "/home/mbajaj/src/personal/mcp-skill",
+          "root": "/home/mbajaj/src/personal/mcp-skill"
+        },
+        "cost": 0.059791,
+        "tokens": {
+          "total": 33489,
+          "input": 1,
+          "output": 397,
+          "reasoning": 0,
+          "cache": {
+            "read": 27297,
+            "write": 5794
+          }
+        },
+        "variant": "max",
+        "finish": "tool-calls",
+        "id": "msg_cc2f0cd09001oSnn0ey0g0TpT9",
+        "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "snapshot": "68fb1dd6bf23792c030e8dbbd457e14bb6dba7b4",
+          "id": "prt_cc2f0d664001BFdUNT4BcJC9jh",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0cd09001oSnn0ey0g0TpT9"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now I have a good understanding of the project. Let me also check the current directory structure for generated skills and look at the CLI to understand the flow better, then also check if app.py is now at the skill root (based on the refactor commit).",
+          "metadata": {
+            "anthropic": {
+              "signature": "REDACTED/REDACTED/NECPl9wnuG1nAIDfaLE9/REDACTED/1DKc6bZCNk/REDACTED"
+            }
+          },
+          "time": {
+            "start": 1772797089381,
+            "end": 1772797091063
+          },
+          "id": "prt_cc2f0d665001EER6GZA7PiJgFh",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0cd09001oSnn0ey0g0TpT9"
+        },
+        {
+          "type": "text",
+          "text": "Let me check the current output structure (post-refactor) and the CLI:",
+          "time": {
+            "start": 1772797091487,
+            "end": 1772797091487
+          },
+          "id": "prt_cc2f0dcf9001ZkEKjGR6eoLnsK",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0cd09001oSnn0ey0g0TpT9"
+        },
+        {
+          "type": "tool",
+          "callID": "REDACTED",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/cli.py"
+            },
+            "output": "<path>/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/cli.py</path>\n<type>file</type>\n<content>1: \"\"\"CLI entry point for mcp-skill.\"\"\"\n2: import asyncio\n3: import os\n4: import sys\n5: \n6: import click\n7: \n8: from pathlib import Path\n9: \n10: from mcp_skill.introspector import connect_and_list_tools\n11: from mcp_skill.generator import generate_app_py, generate_skill_md\n12: from mcp_skill.type_mapper import derive_class_name, derive_module_name, derive_skill_name, generate_skill_description\n13: from mcp_skill.validator import validate_generated_code\n14: \n15: \n16: @click.group()\n17: def main():\n18:     \"\"\"Convert any MCP server into an Agent Skill.\"\"\"\n19: \n20: \n21: @main.command()\n22: @click.option(\"--url\", help=\"MCP server URL\")\n23: @click.option(\"--auth\", type=click.Choice([\"none\", \"api-key\", \"oauth\"]), default=\"none\", help=\"Authentication type\")\n24: @click.option(\"--name\", help=\"Skill name (auto-detected if not provided)\")\n25: @click.option(\"--api-key\", \"api_key\", help=\"API key (when auth=api-key)\")\n26: @click.option(\"--auth-header\", \"auth_header\", default=None, help=\"Header name for API key (e.g. 'x-api-key'). Omit for Bearer token.\")\n27: @click.option(\"--force\", is_flag=True, help=\"Overwrite existing directory\")\n28: @click.option(\"--non-interactive\", is_flag=True, help=\"Skip interactive prompts\")\n29: @click.option(\"--app-name\", \"app_name\", default=None, help=\"App class base name (e.g. 'Fetch' → FetchApp)\")\n30: def create(url, auth, name, api_key, auth_header, force, non_interactive, app_name):\n31:     \"\"\"Create an Agent Skill from an MCP server.\"\"\"\n32:     try:\n33:         # Gather inputs - interactive or from flags\n34:         if non_interactive:\n35:             if not url:\n36:                 click.echo(\"Error: --url is required in non-interactive mode\", err=True)\n37:                 sys.exit(1)\n38:         else:\n39:             # Interactive prompts\n40:             if not url:\n41:                 url = click.prompt(\"MCP Server URL\")\n42:             if auth == \"none\":\n43:                 auth_choice = click.prompt(\n44:                     \"Authentication type\",\n45:                     type=click.Choice([\"none\", \"api-key\", \"oauth\"]),\n46:                     default=\"none\",\n47:                 )\n48:                 auth = auth_choice\n49: \n50:         # Get API key if needed\n51:         if auth == \"api-key\" and not api_key:\n52:             if non_interactive:\n53:                 click.echo(\"Error: --api-key is required when auth=api-key in non-interactive mode\", err=True)\n54:                 sys.exit(1)\n55:             api_key = click.prompt(\"API Key\", hide_input=True)\n56: \n57:         auth_str = None\n58:         headers: dict[str, str] | None = None\n59:         if auth == \"api-key\" and api_key:\n60:             if auth_header:\n61:                 headers = {auth_header: api_key}\n62:                 auth_type = \"header\"\n63:             else:\n64:                 auth_str = api_key\n65:                 auth_type = \"bearer\"\n66:         elif auth == \"oauth\":\n67:             auth_str = \"oauth\"\n68:             auth_type = \"oauth\"\n69:         else:\n70:             auth_type = \"none\"\n71: \n72:         click.echo(f\"Connecting to {url}...\")\n73:         try:\n74:             server_name, tools = asyncio.run(\n75:                 connect_and_list_tools(url, auth_str, headers=headers)\n76:             )\n77:         except (ConnectionError, RuntimeError) as e:\n78:             click.echo(f\"Error: {e}\", err=True)\n79:             sys.exit(1)\n80: \n81:         click.echo(f\"Found {len(tools)} tools:\")\n82:         for tool in tools:\n83:             desc = (tool.description or \"\")[:60]\n84:             click.echo(f\"  - {tool.name}: {desc}\")\n85: \n86:         if not tools:\n87:             click.echo(\"Warning: Server has 0 tools. Generating minimal skill.\")\n88: \n89:         # Determine skill name\n90:         if not name:\n91:             default_name = derive_skill_name(server_name)\n92:             if non_interactive:\n93:                 name = default_name\n94:             else:\n95:                 name = click.prompt(\"Skill name\", default=default_name)\n96:         else:\n97:             name = derive_skill_name(name)\n98: \n99:         # Determine app class name\n100:         if not app_name:\n101:             if non_interactive:\n102:                 app_name = server_name\n103:             else:\n104:                 default_app = server_name.capitalize()\n105:                 app_name = click.prompt(\"App name (base name, 'App' suffix added automatically)\", default=default_app)\n106: \n107:         module_name = derive_module_name(name)\n108:         output_dir = os.path.join(\".agents\", \"skills\", module_name)\n109:         if os.path.exists(output_dir):\n110:             if not force:\n111:                 if non_interactive:\n112:                     click.echo(f\"Error: Directory '{output_dir}' already exists. Use --force to overwrite.\", err=True)\n113:                     sys.exit(1)\n114:                 if not click.confirm(f\"Directory '{output_dir}' exists. Overwrite?\"):\n115:                     click.echo(\"Aborted.\")\n116:                     sys.exit(0)\n117: \n118:         # Generate class name and description\n119:         class_name = derive_class_name(app_name)\n120:         description = generate_skill_description(server_name, tools)\n121: \n122:         click.echo(\"Generating skill...\")\n123: \n124:         app_code = generate_app_py(\n125:             class_name, url, tools,\n126:             auth_type=auth_type, auth_header=auth_header,\n127:             skill_name=name, module_name=module_name,\n128:         )\n129:         skill_md = generate_skill_md(\n130:             name, description, tools, class_name,\n131:             auth_type=auth_type, auth_header=auth_header,\n132:             module_name=module_name,\n133:         )\n134: \n135:         os.makedirs(output_dir, exist_ok=True)\n136: \n137:         with open(os.path.join(output_dir, \"__init__.py\"), \"w\") as f:\n138:             f.write(\"\")\n139: \n140:         with open(os.path.join(output_dir, \"app.py\"), \"w\") as f:\n141:             f.write(app_code)\n142: \n143:         with open(os.path.join(output_dir, \"SKILL.md\"), \"w\") as f:\n144:             f.write(skill_md)\n145: \n146:         app_py_path = Path(output_dir) / \"app.py\"\n147:         click.echo(\"Validating generated code...\")\n148:         report = validate_generated_code(app_py_path)\n149:         click.echo(report.summary())\n150: \n151:         if not report.passed:\n152:             click.echo(\"\\nWarning: Validation found issues. The skill was still generated but may need fixes.\", err=True)\n153: \n154:         click.echo(f\"\\nSkill generated at ./{output_dir}/\")\n155:         click.echo(f\"  {output_dir}/app.py\")\n156:         click.echo(f\"  {output_dir}/SKILL.md\")\n157: \n158:     except Exception as e:\n159:         click.echo(f\"Error: {e}\", err=True)\n160:         sys.exit(1)\n\n(End of file - total 160 lines)\n</content>",
+            "title": "src/mcp_skill/cli.py",
+            "metadata": {
+              "preview": "\"\"\"CLI entry point for mcp-skill.\"\"\"\nimport asyncio\nimport os\nimport sys\n\nimport click\n\nfrom pathlib import Path\n\nfrom mcp_skill.introspector import connect_and_list_tools\nfrom mcp_skill.generator import generate_app_py, generate_skill_md\nfrom mcp_skill.type_mapper import derive_class_name, derive_module_name, derive_skill_name, generate_skill_description\nfrom mcp_skill.validator import validate_generated_code\n\n\n@click.group()\ndef main():\n    \"\"\"Convert any MCP server into an Agent Skill.\"\"\"\n\n",
+              "truncated": false,
+              "loaded": []
+            },
+            "time": {
+              "start": 1772797092455,
+              "end": 1772797092471
+            }
+          },
+          "id": "prt_cc2f0dea0001mUVIVawme9fmR6",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0cd09001oSnn0ey0g0TpT9"
+        },
+        {
+          "type": "tool",
+          "callID": "toolu_015QmdiFCcimGLEKnvCSwuRu",
+          "tool": "bash",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "export CI=true DEBIAN_FRONTEND=noninteractive GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never HOMEBREW_NO_AUTO_UPDATE=1 GIT_EDITOR=: EDITOR=: VISUAL='' GIT_SEQUENCE_EDITOR=: GIT_MERGE_AUTOEDIT=no GIT_PAGER=cat PAGER=cat npm_config_yes=true PIP_NO_INPUT=1 YARN_ENABLE_IMMUTABLE_INSTALLS=false; export GIT_PAGER=cat PAGER=cat; git log --all --oneline --graph",
+              "description": "Full git graph",
+              "workdir": "/home/mbajaj/src/personal/mcp-skill"
+            },
+            "output": "* 67fa801 Checkpoint: b1adfe56b011\n* 92bb0f1 Checkpoint: b1adfe56b011\n* c9ff354 Checkpoint: 7fa7de633f62\n* 738ebaa Checkpoint: 13c65eb6a821\n* 560efc8 Checkpoint: e83d53f596e5\n* b12fca5 Initialize metadata branch\n* afba3b6 fix: sanitize skill name to valid Python identifier for folder and imports\n* a88774d refactor: move app.py to skill root for package-style imports\n* 531e402 feat: add persistent disk-backed token storage for all auth types\n* 99bd4ef feat(templates): unify __init__ signature to use auth=None across all auth types\n* 516218b feat: fix skill output, add deps/usage to SKILL.md, add post-gen validation\n* 0102fac refactor(generate): remove dead _build_call_args function and unused call\n* c65bb3e fix(generate): use per-method client pattern and user-provided app name\n* 48e4b56 fix(generate): use result.content for CallToolResult and filter None optional args\n* 2e7e30c feat(cli): add interactive wizard and non-interactive CLI mode\n* 5256855 feat(core): add introspector, app.py generator, and SKILL.md generator\n* 6234fa1 feat(types): add JSON Schema to Python type mapper and name sanitizer\n* afcecd9 feat(scaffold): initialize mcp-skill project with UV and pyproject.toml\n* f542147 [CONTEXT]: I'm investigating a codebase (likely a CLI tool or scaffoldin\n* 3395d7d [CONTEXT]: This codebase has a scaffolding/generation system that create\n* 5317a78 Ideally I think we should create a similar API key auth, which is a wrap\n* dce0836 [CONTEXT]: Implementing OAuth token persistence for fastmcp Client using\n* bc3884e [CONTEXT]: Working on mcp-skill project at /home/mbajaj/src/personal/mcp\n* e22eef9 We don't need to worry about remote environemnt now\n* c949d40 <system-reminder> [ALL BACKGROUND TASKS COMPLETE]\n* 1796d66 <system-reminder> [ALL BACKGROUND TASKS COMPLETE]\n* 28c3c96 [CONTEXT]: I'm trying to connect to Notion's MCP server at https://mcp.n\n* 3ddaa60 carry forward: uncommitted session files\n",
+            "title": "Full git graph",
+            "metadata": {
+              "output": "* 67fa801 Checkpoint: b1adfe56b011\n* 92bb0f1 Checkpoint: b1adfe56b011\n* c9ff354 Checkpoint: 7fa7de633f62\n* 738ebaa Checkpoint: 13c65eb6a821\n* 560efc8 Checkpoint: e83d53f596e5\n* b12fca5 Initialize metadata branch\n* afba3b6 fix: sanitize skill name to valid Python identifier for folder and imports\n* a88774d refactor: move app.py to skill root for package-style imports\n* 531e402 feat: add persistent disk-backed token storage for all auth types\n* 99bd4ef feat(templates): unify __init__ signature to use auth=None across all auth types\n* 516218b feat: fix skill output, add deps/usage to SKILL.md, add post-gen validation\n* 0102fac refactor(generate): remove dead _build_call_args function and unused call\n* c65bb3e fix(generate): use per-method client pattern and user-provided app name\n* 48e4b56 fix(generate): use result.content for CallToolResult and filter None optional args\n* 2e7e30c feat(cli): add interactive wizard and non-interactive CLI mode\n* 5256855 feat(core): add introspector, app.py generator, and SKILL.md generator\n* 6234fa1 feat(types): add JSON Schema to Python type mapper and name sanitizer\n* afcecd9 feat(scaffold): initialize mcp-skill project with UV and pyproject.toml\n* f542147 [CONTEXT]: I'm investigating a codebase (likely a CLI tool or scaffoldin\n* 3395d7d [CONTEXT]: This codebase has a scaffolding/generation system that create\n* 5317a78 Ideally I think we should create a similar API key auth, which is a wrap\n* dce0836 [CONTEXT]: Implementing OAuth token persistence for fastmcp Client using\n* bc3884e [CONTEXT]: Working on mcp-skill project at /home/mbajaj/src/personal/mcp\n* e22eef9 We don't need to worry about remote environemnt now\n* c949d40 <system-reminder> [ALL BACKGROUND TASKS COMPLETE]\n* 1796d66 <system-reminder> [ALL BACKGROUND TASKS COMPLETE]\n* 28c3c96 [CONTEXT]: I'm trying to connect to Notion's MCP server at https://mcp.n\n* 3ddaa60 carry forward: uncommitted session files\n",
+              "exit": 0,
+              "description": "Full git graph",
+              "truncated": false
+            },
+            "time": {
+              "start": 1772797095831,
+              "end": 1772797095879
+            }
+          },
+          "id": "prt_cc2f0e269001hes82TX4pJoPX8",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0cd09001oSnn0ey0g0TpT9"
+        },
+        {
+          "type": "step-finish",
+          "reason": "tool-calls",
+          "snapshot": "68fb1dd6bf23792c030e8dbbd457e14bb6dba7b4",
+          "cost": 0.059791,
+          "tokens": {
+            "total": 33489,
+            "input": 1,
+            "output": 397,
+            "reasoning": 0,
+            "cache": {
+              "read": 27297,
+              "write": 5794
+            }
+          },
+          "id": "prt_cc2f0efc9001f7bS3IRWbXbzzW",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0cd09001oSnn0ey0g0TpT9"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1772797095935,
+          "completed": 1772797162371
+        },
+        "parentID": "REDACTED",
+        "modelID": "claude-opus-4-6",
+        "providerID": "anthropic",
+        "mode": "Sisyphus (Ultraworker)",
+        "agent": "Sisyphus (Ultraworker)",
+        "path": {
+          "cwd": "/home/mbajaj/src/personal/mcp-skill",
+          "root": "/home/mbajaj/src/personal/mcp-skill"
+        },
+        "cost": 0.12089425,
+        "tokens": {
+          "total": 39719,
+          "input": 1,
+          "output": 3356,
+          "reasoning": 0,
+          "cache": {
+            "read": 33091,
+            "write": 3271
+          }
+        },
+        "variant": "max",
+        "finish": "tool-calls",
+        "id": "msg_cc2f0efff001z0krGv5yBSP2hL",
+        "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "snapshot": "68fb1dd6bf23792c030e8dbbd457e14bb6dba7b4",
+          "id": "prt_cc2f0fa04001Le4QuojXwSlh6b",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0efff001z0krGv5yBSP2hL"
+        },
+        {
+          "type": "reasoning",
+          "text": "Now I have all the context I need. Let me understand the key changes since the README was last written:\n\n1. **Structure changed**: `app.py` moved from `scripts/app.py` to `<skill>/app.py` (refactor commit a88774d)\n2. **Skill names sanitized**: hyphens converted to underscores for valid Python modules (afba3b6)\n3. **Persistent token storage**: DiskStore for auth tokens at `~/.mcp-skill/<name>/` (531e402)\n4. **Unified auth signature**: `auth=None` across all auth types (99bd4ef)\n\n\n5. **Package-style imports**: Now using `from <skill_name>.app import <ClassName>` instead of the old `scripts` path\n\nThe README is significantly out of date—it still references the old `scripts/` directory structure and outdated import patterns, plus the task list and limitations need refreshing. I should also incorporate the user's suggestion for a better hook that emphasizes turning any MCP server into a typed Python SDK.\n\nNow I'm planning the structural updates: the output directory is `.agents/skills/<module_name>/` with underscores, each skill contains `app.py`, `__init__.py`, and `SKILL.md`, and imports work with `PYTHONPATH=.agents/skills`. I'll add a Before/After section to show the contrast, tighten up the motivation, include a visual diagram, display the generated output structure with code examples, update the limitations to reflect the current state (limited auth support, fastmcp dependency), and create a new \"Who This Is For\" section.\n\nI need to be careful about the directory structure in the README—the user suggested `parallel-search` with a `scripts/` subdirectory, but the actual refactored structure uses `parallel_search` with `app.py` at the skill root, so I'll document what's actually being generated rather than the older format. I'm checking the actual file structure that the CLI generates - it's simpler than I initially thought, with just `__init__.py`, `app.py`, and `SKILL.md` in the `.agents/skills/<module_name>/` directory. The user's suggestion for the code snippet style works well here. Now I'm drafting the README with a before-and-after comparison showing how agents interact with MCP tools, and I'll use a simple text-based flow diagram to illustrate the concept. I'm showing the architecture of how an MCP server connects through the CLI tool to generate a typed Python SDK that agents can call directly, with the flow moving from server discovery through schema mapping to code generation and validation.\n\nThe key insight is that traditional tool calling requires round-tripping through the model for each invocation, which wastes tokens and adds latency. By compiling the MCP server into a Python class with typed async methods, agents can write code that calls tools directly in a single block without waiting between calls. The setup uses a simple command-line interface to point at any MCP server and generate the SDK automatically. Defining the app class...\n\nThe generated code creates a `ParallelApp` class that wraps MCP server tools, exposing methods like `web_search_preview` and `fetch_url` that handle the connection and tool invocation internally. This is useful for developers building agents or automation systems that need direct programmatic access to MCP tools without going through a language model. There are some current limitations though — it only supports basic auth methods, depends on the fastmcp library, creates a new connection for each call rather than reusing them, and doesn't yet handle resources or prompts. I'm reviewing the user's specific requests and need to align the structure with what they actually asked for. They want a tighter layout: better hook with tagline, before/after examples, a diagram showing how it works, the motivation section condensed, setup instructions, usage with actual generated output, a \"Who This Is For\" section, and improved limitations. I also need to account for recent changes in the codebase—the structure is now flat without a scripts subdirectory, imports work package-style, token storage is persistent, and module names get sanitized by converting hyphens to underscores. So when showing the generated output, I should display `parallel_search/` rather than `parallel-search/` since that's what the tool actually produces. I'm reviewing the task list against what's actually been completed based on the git history—most items are checked off, with only MCP resources and prompts still pending. I've also identified several additional improvements that were implemented since the README was originally written, like moving app.py to the skill root and adding persistent token storage. Now I need to write out the full README with these updates and figure out where to incorporate the tagline the user mentioned.",
+          "metadata": {
+            "anthropic": {
+              "signature": "ErVbCkYICxgCKkDdhpkWGgbaFpsh7bXOY/REDACTED/b4ICoyxjPblF/REDACTED/REDACTED/O39rF/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED//REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/+ZGX5l4CuUNUDl/REDACTED/IXaRqWEAZSdgh0FWK/REDACTED/BpJRSTMd2QOk2MnR5T01HyfKSOMYOiRCj5Y/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/IKcoB/9AQkAsztmoAtYQGn6U6ognHXHWQ/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/CJcaI7Grzelcgx/6RDbYhbDkeyMk61CeZWgkQKhs0BC95eKLM/REDACTED/REDACTED/oaSrfelQhMrojup7hYa9/5buSNdXhA/REDACTED/REDACTED/09Cjk1bbwD1ljo68W/ChG7n2LyY5AfLsuuH/lE7qjiWhjA/REDACTED/Qe8QdrMGWHtZJ+jaR+fozaZC+Q+v/REDACTED/REDACTED/REDACTED/BBmwbQe6UXc/3S7ITL6Q7+tG0Gis4wlT/T/REDACTED/ZqDT/7G0Z3v6/iEu/mM+awFB9h91T0QKwIL5/eykTITcEgX6Tb5w9oQ/REDACTED/REDACTED/kBxMfzsYI8CCxkVS/xfxP5dy3bKF51yidNzrhV1XW4OIZ/REDACTED/PCNMk/REDACTED/REDACTED/icNXosv/REDACTED/6fdPw+kc0+OcH5epAlRpFYZM8fzZ/JcGJPXkiAqi6vM/REDACTED/REDACTED/YkQjgLqd/REDACTED/REDACTED/Frh6C1S8J/REDACTED/REDACTED/gWAGf3B/2udKmAxLeO1vBQ27wIHYb/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/SK1sVNd1NwSw/REDACTED/t/REDACTED/gSZLL5PBPE8RNoo78GpuGQKrWpvDl/AgNc4RJJWh3qt/8/REDACTED/REDACTED/REDACTED/Pv//REDACTED/REDACTED/3wENB9imOPqZPdwz4K9Xu36qsFuR/HuwipXZAs3RjTZj90zLOX/R/FCrOFx5Ntsdrf7JbJ81y/4n3iTkCffC4FtFOQ7mMRPeFr0bM/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/n3/REDACTED/REDACTED/zs9Iu/q4QiMsOJikYw/Un7NqXUD+yRPLgnIZh9rpj9+buPA/eF0/EWxnfneHtZ2eCa1Sl7krK4/REDACTED/emdulPnhArlelbdaAo/REDACTED/CELMwiSCT5Japm1J69y/REDACTED/+wLAO2vmYk58CdK/REDACTED/REDACTED/KgrnV7eBQKKwy1Ci8/ntTVqmUehkqzF2bfSFVm+LTBvU8/dW1Tht9EtAp+sSb/LtWUL+xN7miM9I/PKv/REDACTED/t/REDACTED/REDACTED/REDACTED/zp29N9lvXUPv/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/wNFDRiIacGdJUKd+IBK3z2v/rjdHR3XEMXTvkjfLzDbawfyq9y/evADH55D/CEkxBYX9xsl3/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/TQdt/jMpf/REDACTED/BWJn6Q/REDACTED/REDACTED/BDtqm6Tbo/cL6fqFEfhEoKpDv7Mdk/REDACTED/OXJrPdoBI23rcxpgoyKVPZTmJJ/REDACTED/kpduwk/REDACTED/REDACTED/rb5u7sGIzd+JHHXQNkOdPo/REDACTED/REDACTED/RzgC0MsqHH803kBA4CMGZg/G2QbVwdpj+ytqYQXOD/nDjwt1Dh/REDACTED/REDACTED/EgM0To2VD8NLa8hP2VpkGS/EO9qeTD81ev705DiglmVmNI/REDACTED/5ooz3KRYrcO2KfowoZ3dTClJ/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/qURrT/m/Ks4Gy/REDACTED/REDACTED/REDACTED/rycAg7GoZ7B0pLIQ07N/297tWwVOKNIOa/REDACTED/EBLNVVK15xL4d9a/nKpg9dK/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/12anW/2ONqI6M9a2HahiUjPH/xZmT85m2h0qx619N7Grg3520cGb/REDACTED/SAM/REDACTED/REDACTED/6fhN6wpfgYmvR0IZFLt/REDACTED/SqLwV1PbT+nG/REDACTED//qCFYOkcLQId0o/REDACTED/REDACTED/dGKONEv+T79PLUaZnq3L/REDACTED/REDACTED/REDACTED/REDACTED/dBK/REDACTED/REDACTED/REDACTED/REDACTED/o4UP1k47k//REDACTED"
+            }
+          },
+          "time": {
+            "start": 1772797098501,
+            "end": 1772797161437
+          },
+          "id": "prt_cc2f0fa05001NZUvDGBhHvCNCx",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0efff001z0krGv5yBSP2hL"
+        },
+        {
+          "type": "text",
+          "text": "Now I have full context. The README is outdated — it still shows the `scripts/` subdirectory structure, old import paths, and doesn't reflect the refactors (flat package layout, persistent token storage, sanitized module names). Let me apply all the user's suggestions plus the git history updates.",
+          "time": {
+            "start": 1772797161454,
+            "end": 1772797161454
+          },
+          "id": "prt_cc2f1efe1001Tdc9ZrLOS6vhaa",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0efff001z0krGv5yBSP2hL"
+        },
+        {
+          "type": "tool",
+          "callID": "REDACTED",
+          "tool": "todowrite",
+          "state": {
+            "status": "completed",
+            "input": {
+              "todos": [
+                {
+                  "content": "Rewrite README.md with all user suggestions + git history accuracy",
+                  "status": "in_progress",
+                  "priority": "high"
+                },
+                {
+                  "content": "Verify README accuracy against actual codebase (structure, imports, auth)",
+                  "status": "pending",
+                  "priority": "high"
+                }
+              ]
+            },
+            "output": "[\n  {\n    \"content\": \"Rewrite README.md with all user suggestions + git history accuracy\",\n    \"status\": \"in_progress\",\n    \"priority\": \"high\"\n  },\n  {\n    \"content\": \"Verify README accuracy against actual codebase (structure, imports, auth)\",\n    \"status\": \"pending\",\n    \"priority\": \"high\"\n  }\n]",
+            "title": "2 todos",
+            "metadata": {
+              "todos": [
+                {
+                  "content": "Rewrite README.md with all user suggestions + git history accuracy",
+                  "status": "in_progress",
+                  "priority": "high"
+                },
+                {
+                  "content": "Verify README accuracy against actual codebase (structure, imports, auth)",
+                  "status": "pending",
+                  "priority": "high"
+                }
+              ],
+              "truncated": false
+            },
+            "time": {
+              "start": 1772797162279,
+              "end": 1772797162335
+            }
+          },
+          "id": "prt_cc2f1efef001NK34l3SRj40CGH",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0efff001z0krGv5yBSP2hL"
+        },
+        {
+          "type": "step-finish",
+          "reason": "tool-calls",
+          "snapshot": "68fb1dd6bf23792c030e8dbbd457e14bb6dba7b4",
+          "cost": 0.12089425,
+          "tokens": {
+            "total": 39719,
+            "input": 1,
+            "output": 3356,
+            "reasoning": 0,
+            "cache": {
+              "read": 33091,
+              "write": 3271
+            }
+          },
+          "id": "prt_cc2f1f361001N2K5P3tKo0cwt0",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f0efff001z0krGv5yBSP2hL"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1772797162375,
+          "completed": 1772797186665
+        },
+        "parentID": "REDACTED",
+        "modelID": "claude-opus-4-6",
+        "providerID": "anthropic",
+        "mode": "Sisyphus (Ultraworker)",
+        "agent": "Sisyphus (Ultraworker)",
+        "path": {
+          "cwd": "/home/mbajaj/src/personal/mcp-skill",
+          "root": "/home/mbajaj/src/personal/mcp-skill"
+        },
+        "cost": 0.08576725,
+        "tokens": {
+          "total": 41587,
+          "input": 1,
+          "output": 1863,
+          "reasoning": 0,
+          "cache": {
+            "read": 36362,
+            "write": 3361
+          }
+        },
+        "variant": "max",
+        "finish": "tool-calls",
+        "id": "msg_cc2f1f387001edKP2xMmv3EST3",
+        "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "snapshot": "68fb1dd6bf23792c030e8dbbd457e14bb6dba7b4",
+          "id": "prt_cc2f1fd2c001mK5NPLM4kwCHND",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f1f387001edKP2xMmv3EST3"
+        },
+        {
+          "type": "tool",
+          "callID": "toolu_01DRGgRFycYurfUSVjGRo2wo",
+          "tool": "write",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/mbajaj/src/personal/mcp-skill/README.md",
+              "content": "# mcp-skill\n\nTurn any MCP server into a typed Python SDK.\n\n> **Compile MCP tools into code.**\n\n`mcp-skill` introspects an MCP server and generates a Python class where each tool becomes a typed async method.\n\n## Before and After\n\n### Before\n\nAgents call MCP tools through the model loop — one round-trip per tool call:\n\n```\nllm.call_tool(\"web_search_preview\", {\"query\": \"...\"})\n# → model decides next step → calls another tool → model decides again → ...\n```\n\n### After\n\nAgents call tools directly in code:\n\n```python\nresult = await app.web_search_preview(\n    objective=\"find latest news\",\n    search_queries=[\"topic X 2026\"]\n)\n# Agent processes result in code — no round-trip back to model\n```\n\n## How It Works\n\n```\n┌─────────────┐      ┌───────────────┐      ┌────────────────────┐\n│  MCP Server  │─────▶│  mcp-skill    │─────▶│  Generated Skill   │\n│  (any URL)   │      │  CLI          │      │                    │\n│              │      │               │      │  app.py            │\n│  Tools:      │      │  1. Connect   │      │  ├─ Typed class    │\n│  - search    │      │  2. Introspec │      │  ├─ Async methods  │\n│  - fetch     │      │  3. Map types │      │  ├─ Auth + storage │\n│  - ...       │      │  4. Generate  │      │  └─ JSON parsing   │\n│              │      │  5. Validate  │      │                    │\n└─────────────┘      └───────────────┘      │  SKILL.md          │\n                                             │  └─ Agent docs     │\n                                             └────────────────────┘\n```\n\n1. Connects to the MCP server using [fastmcp](https://github.com/jlowin/fastmcp)\n2. Introspects all available tools via `list_tools()`\n3. Converts each tool's JSON Schema into Python type annotations\n4. Generates a typed `App` class where each MCP tool becomes an `async` method\n5. Validates the output with `ast.parse` → `ruff` → `ty`\n6. Generates `SKILL.md` with tool documentation and usage examples for agents\n\n## Motivation\n\nMCP servers give agents access to tools, but every tool call round-trips through the model — request tool, execute, full result back into context, decide next step. For large payloads or sequential calls, this burns tokens and adds latency.\n\n[Programmatic Tool Calling](https://platform.openai.com/docs/guides/tools) fixes this: the agent writes code that calls tools directly, without model round-trips per invocation. Fetch, filter, aggregate — all in one code block.\n\n**mcp-skill** makes this possible by compiling any MCP server into a plain Python class. Each tool becomes a typed async method. The agent just writes Python.\n\n```python\nfrom parallel_search.app import ParallelApp\n\napp = ParallelApp(auth=\"sk-...\")\nresult = await app.web_search_preview(\n    objective=\"find latest news on topic X\",\n    search_queries=[\"topic X 2026\"]\n)\n```\n\n## Setup\n\n```bash\n# Install with uv\nuv pip install -e .\n\n# Or use directly\nuv run mcp-skill create --url https://your-mcp-server.com/mcp --auth api-key\n```\n\nRequires [uv](https://github.com/astral-sh/uv) and Python 3.10+.\n\n## Usage\n\n```bash\n# Interactive mode — prompts for URL, auth type, etc.\nmcp-skill create\n\n# Non-interactive mode\nmcp-skill create \\\n  --url https://search-mcp.parallel.ai/mcp \\\n  --auth api-key \\\n  --api-key YOUR_KEY \\\n  --name parallel-search \\\n  --non-interactive\n```\n\n### Generated Output\n\nThe skill lands in `.agents/skills/<name>/` as a Python package:\n\n```\n.agents/skills/parallel_search/\n├── __init__.py\n├── app.py          # Typed Python class wrapping the MCP server\n└── SKILL.md        # Agent-facing docs, dependencies, and usage\n```\n\nHere's what the generated `app.py` looks like:\n\n```python\nclass ParallelApp:\n\n    def __init__(self, url: str = \"https://...\", auth=None) -> None:\n        ...\n\n    async def web_search_preview(\n        self,\n        objective: str,\n        search_queries: list[str],\n    ) -> dict[str, Any]:\n        \"\"\"Search the web with multiple queries in parallel.\"\"\"\n        ...\n\n    async def fetch_url(\n        self,\n        url: str,\n        max_length: int = None,\n    ) -> dict[str, Any]:\n        \"\"\"Fetch and extract content from a URL.\"\"\"\n        ...\n\n    def list_tools(self):\n        return [self.web_search_preview, self.fetch_url]\n```\n\nEach method connects to the MCP server, calls the underlying tool, and returns parsed JSON. Auth credentials are persisted to disk (`~/.mcp-skill/<name>/`) after first use — provide once, reuse automatically.\n\n## Who Is This For?\n\nDevelopers building:\n\n- **MCP-based agents** that need direct tool access without model round-trips\n- **Automation systems** using MCP tools as programmatic building blocks\n- **Code-execution agents** using [Programmatic Tool Calling](https://platform.claude.com/cookbook/tool-use-programmatic-tool-calling-ptc)\n\n## Current Limitations\n\n- **Auth**: Supports API key (Bearer or custom header), OAuth, and none — no mTLS or complex auth flows\n- **Runtime dependency**: Generated code depends on [fastmcp](https://github.com/jlowin/fastmcp) for MCP client connections\n- **Connection per call**: Each method creates a new MCP client connection (no pooling)\n- **Tools only**: MCP resources and prompts not yet supported\n\n## Task List\n\nTracked improvements based on real-world usage:\n\n- [x] **Fix output directory path** — Changed from `.agents/skill/<name>` to `.agents/skills/<name>`\n- [x] **Add dependency info to SKILL.md** — Dependencies listed with `uv` and `pip` install commands\n- [x] **Generate `__init__.py`** — Skill directory is a proper Python package\n- [x] **Post-generation validation** — `ast.parse` → `ruff check` → `ty check` with `uvx` fallback\n- [x] **Package-style imports** — Moved `app.py` to skill root; import via `from <skill>.app import <Class>`\n- [x] **Persistent token storage** — Disk-backed credential storage at `~/.mcp-skill/<name>/`\n- [x] **Unified auth signature** — All auth types use `auth=None` in `__init__`\n- [x] **Sanitize skill names** — Hyphens/dots converted to underscores for valid Python identifiers\n- [ ] **Support MCP resources and prompts** — Currently only tools are introspected and generated\n"
+            },
+            "output": "Wrote file successfully.",
+            "title": "README.md",
+            "metadata": {
+              "diagnostics": {
+                "/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/generator.py": [],
+                "/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/cli.py": []
+              },
+              "filepath": "/home/mbajaj/src/personal/mcp-skill/README.md",
+              "exists": true,
+              "truncated": false
+            },
+            "time": {
+              "start": 1772797186574,
+              "end": 1772797186623
+            }
+          },
+          "id": "prt_cc2f1fd2d0019YmhVzf8CR6bl8",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f1f387001edKP2xMmv3EST3"
+        },
+        {
+          "type": "step-finish",
+          "reason": "tool-calls",
+          "snapshot": "6399ad49479349f316ae03b13c4d50d8a8039b1b",
+          "cost": 0.08576725,
+          "tokens": {
+            "total": 41587,
+            "input": 1,
+            "output": 1863,
+            "reasoning": 0,
+            "cache": {
+              "read": 36362,
+              "write": 3361
+            }
+          },
+          "id": "REDACTED",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f1f387001edKP2xMmv3EST3"
+        },
+        {
+          "type": "patch",
+          "hash": "68fb1dd6bf23792c030e8dbbd457e14bb6dba7b4",
+          "files": [
+            "/home/mbajaj/src/personal/mcp-skill/README.md"
+          ],
+          "id": "prt_cc2f25260001LylaFK0nY0E8Cc",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f1f387001edKP2xMmv3EST3"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1772797186669,
+          "completed": 1772797190010
+        },
+        "parentID": "REDACTED",
+        "modelID": "claude-opus-4-6",
+        "providerID": "anthropic",
+        "mode": "Sisyphus (Ultraworker)",
+        "agent": "Sisyphus (Ultraworker)",
+        "path": {
+          "cwd": "/home/mbajaj/src/personal/mcp-skill",
+          "root": "/home/mbajaj/src/personal/mcp-skill"
+        },
+        "cost": 0.03458525,
+        "tokens": {
+          "total": 41722,
+          "input": 1,
+          "output": 119,
+          "reasoning": 0,
+          "cache": {
+            "read": 39723,
+            "write": 1879
+          }
+        },
+        "variant": "max",
+        "finish": "tool-calls",
+        "id": "msg_cc2f2526d001Ig3XBhRY06Zkf4",
+        "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "snapshot": "6399ad49479349f316ae03b13c4d50d8a8039b1b",
+          "id": "prt_cc2f25c05001UgcyvJfJK3XL7m",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f2526d001Ig3XBhRY06Zkf4"
+        },
+        {
+          "type": "tool",
+          "callID": "REDACTED",
+          "tool": "todowrite",
+          "state": {
+            "status": "completed",
+            "input": {
+              "todos": [
+                {
+                  "content": "Rewrite README.md with all user suggestions + git history accuracy",
+                  "status": "completed",
+                  "priority": "high"
+                },
+                {
+                  "content": "Verify README accuracy against actual codebase (structure, imports, auth)",
+                  "status": "in_progress",
+                  "priority": "high"
+                }
+              ]
+            },
+            "output": "[\n  {\n    \"content\": \"Rewrite README.md with all user suggestions + git history accuracy\",\n    \"status\": \"completed\",\n    \"priority\": \"high\"\n  },\n  {\n    \"content\": \"Verify README accuracy against actual codebase (structure, imports, auth)\",\n    \"status\": \"in_progress\",\n    \"priority\": \"high\"\n  }\n]",
+            "title": "1 todos",
+            "metadata": {
+              "todos": [
+                {
+                  "content": "Rewrite README.md with all user suggestions + git history accuracy",
+                  "status": "completed",
+                  "priority": "high"
+                },
+                {
+                  "content": "Verify README accuracy against actual codebase (structure, imports, auth)",
+                  "status": "in_progress",
+                  "priority": "high"
+                }
+              ],
+              "truncated": false
+            },
+            "time": {
+              "start": 1772797189933,
+              "end": 1772797189973
+            }
+          },
+          "id": "prt_cc2f25c06001B04cF9xBKBnueF",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f2526d001Ig3XBhRY06Zkf4"
+        },
+        {
+          "type": "step-finish",
+          "reason": "tool-calls",
+          "snapshot": "6399ad49479349f316ae03b13c4d50d8a8039b1b",
+          "cost": 0.03458525,
+          "tokens": {
+            "total": 41722,
+            "input": 1,
+            "output": 119,
+            "reasoning": 0,
+            "cache": {
+              "read": 39723,
+              "write": 1879
+            }
+          },
+          "id": "prt_cc2f25f57001BVjyC2hjBs3nvz",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f2526d001Ig3XBhRY06Zkf4"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1772797190016,
+          "completed": 1772797199769
+        },
+        "parentID": "REDACTED",
+        "modelID": "claude-opus-4-6",
+        "providerID": "anthropic",
+        "mode": "Sisyphus (Ultraworker)",
+        "agent": "Sisyphus (Ultraworker)",
+        "path": {
+          "cwd": "/home/mbajaj/src/personal/mcp-skill",
+          "root": "/home/mbajaj/src/personal/mcp-skill"
+        },
+        "cost": 0.0357685,
+        "tokens": {
+          "total": 42368,
+          "input": 1,
+          "output": 543,
+          "reasoning": 0,
+          "cache": {
+            "read": 41602,
+            "write": 222
+          }
+        },
+        "variant": "max",
+        "finish": "tool-calls",
+        "id": "msg_cc2f25f80001HBX9dzLy98ROgZ",
+        "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "snapshot": "6399ad49479349f316ae03b13c4d50d8a8039b1b",
+          "id": "prt_cc2f2688b001U11vunvVgD3Smo",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f25f80001HBX9dzLy98ROgZ"
+        },
+        {
+          "type": "text",
+          "text": "Now let me verify the README is accurate against the actual codebase:",
+          "time": {
+            "start": 1772797192736,
+            "end": 1772797192736
+          },
+          "id": "prt_cc2f2688c001yRy1Msq5bjCSBW",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f25f80001HBX9dzLy98ROgZ"
+        },
+        {
+          "type": "tool",
+          "callID": "toolu_017PEf21quJDggEoubhQZ3EM",
+          "tool": "bash",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "export CI=true DEBIAN_FRONTEND=noninteractive GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never HOMEBREW_NO_AUTO_UPDATE=1 GIT_EDITOR=: EDITOR=: VISUAL='' GIT_SEQUENCE_EDITOR=: GIT_MERGE_AUTOEDIT=no GIT_PAGER=cat PAGER=cat npm_config_yes=true PIP_NO_INPUT=1 YARN_ENABLE_IMMUTABLE_INSTALLS=false; python3 -c \"\nfrom mcp_skill.type_mapper import derive_module_name, derive_class_name\nprint('parallel-search ->', derive_module_name('parallel-search'))\nprint('class:', derive_class_name('Parallel'))\n\"",
+              "description": "Verify name derivation functions",
+              "workdir": "/home/mbajaj/src/personal/mcp-skill"
+            },
+            "output": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nModuleNotFoundError: No module named 'mcp_skill'\n",
+            "title": "Verify name derivation functions",
+            "metadata": {
+              "output": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nModuleNotFoundError: No module named 'mcp_skill'\n",
+              "exit": 1,
+              "description": "Verify name derivation functions",
+              "truncated": false
+            },
+            "time": {
+              "start": 1772797197470,
+              "end": 1772797197641
+            }
+          },
+          "id": "prt_cc2f26a21001PQvOcE6ehXe6mk",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f25f80001HBX9dzLy98ROgZ"
+        },
+        {
+          "type": "tool",
+          "callID": "REDACTED",
+          "tool": "grep",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "output_dir|app\\.py|SKILL\\.md|__init__\\.py",
+              "include": "cli.py",
+              "output_mode": "content",
+              "path": "/home/mbajaj/src/personal/mcp-skill/src"
+            },
+            "output": "Found 12 match(es) in 1 file(s)\n\n/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/cli.py\n  108: output_dir = os.path.join(\".agents\", \"skills\", module_name)\n  109: if os.path.exists(output_dir):\n  112: click.echo(f\"Error: Directory '{output_dir}' already exists. Use --force to overwrite.\", err=True)\n  114: if not click.confirm(f\"Directory '{output_dir}' exists. Overwrite?\"):\n  135: os.makedirs(output_dir, exist_ok=True)\n  137: with open(os.path.join(output_dir, \"__init__.py\"), \"w\") as f:\n  140: with open(os.path.join(output_dir, \"app.py\"), \"w\") as f:\n  143: with open(os.path.join(output_dir, \"SKILL.md\"), \"w\") as f:\n  146: app_py_path = Path(output_dir) / \"app.py\"\n  154: click.echo(f\"\\nSkill generated at ./{output_dir}/\")\n  155: click.echo(f\"  {output_dir}/app.py\")\n  156: click.echo(f\"  {output_dir}/SKILL.md\")\n\n[Agent Usage Reminder]\n\nYou called a search/fetch tool directly without leveraging specialized agents.\n\nRECOMMENDED: Use task with explore/librarian agents for better results:\n\n```\n// Parallel exploration - fire multiple agents simultaneously\ntask(agent=\"explore\", prompt=\"Find all files matching pattern X\")\ntask(agent=\"explore\", prompt=\"Search for implementation of Y\") \ntask(agent=\"librarian\", prompt=\"Lookup documentation for Z\")\n\n// Then continue your work while they run in background\n// System will notify you when each completes\n```\n\nWHY:\n- Agents can perform deeper, more thorough searches\n- Background tasks run in parallel, saving time\n- Specialized agents have domain expertise\n- Reduces context window usage in main session\n\nALWAYS prefer: Multiple parallel task calls > Direct tool calls\n",
+            "title": "",
+            "metadata": {
+              "truncated": false
+            },
+            "time": {
+              "start": 1772797198919,
+              "end": 1772797198952
+            }
+          },
+          "id": "prt_cc2f27ca00017EcWV7cRUhQ9sV",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f25f80001HBX9dzLy98ROgZ"
+        },
+        {
+          "type": "tool",
+          "callID": "toolu_01LB7CrCWq27kvJvVvbJTrAc",
+          "tool": "grep",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "DiskStore|\\.mcp-skill",
+              "include": "*.j2",
+              "output_mode": "content",
+              "path": "/home/mbajaj/src/personal/mcp-skill/src"
+            },
+            "output": "Found 12 match(es) in 2 file(s)\n\n/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/templates/app.py.j2\n  12: from key_value.aio.stores.disk import DiskStore\n  28: def __init__(self, api_key: str | None, token_storage: DiskStore):\n  45: \"~/.mcp-skill/{{ skill_name }}/api-tokens/. \"\n  60: def __init__(self, api_key: str | None, token_storage: DiskStore):\n  77: \"~/.mcp-skill/{{ skill_name }}/api-tokens/. \"\n  94: self._token_storage = DiskStore(\n  95: directory=Path.home() / \".mcp-skill\" / \"{{ skill_name }}\" / \"api-tokens\"\n  105: self._token_storage = DiskStore(\n  106: directory=Path.home() / \".mcp-skill\" / \"{{ skill_name }}\" / \"oauth-tokens\"\n\n/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/templates/skill.md.j2\n  22: to `~/.mcp-skill/{{ skill_name }}/api-tokens/` after first use, so subsequent\n  36: The API key is persisted to `~/.mcp-skill/{{ skill_name }}/api-tokens/` after\n  51: to `~/.mcp-skill/{{ skill_name }}/oauth-tokens/` so subsequent runs reuse the\n\n[Agent Usage Reminder]\n\nYou called a search/fetch tool directly without leveraging specialized agents.\n\nRECOMMENDED: Use task with explore/librarian agents for better results:\n\n```\n// Parallel exploration - fire multiple agents simultaneously\ntask(agent=\"explore\", prompt=\"Find all files matching pattern X\")\ntask(agent=\"explore\", prompt=\"Search for implementation of Y\") \ntask(agent=\"librarian\", prompt=\"Lookup documentation for Z\")\n\n// Then continue your work while they run in background\n// System will notify you when each completes\n```\n\nWHY:\n- Agents can perform deeper, more thorough searches\n- Background tasks run in parallel, saving time\n- Specialized agents have domain expertise\n- Reduces context window usage in main session\n\nALWAYS prefer: Multiple parallel task calls > Direct tool calls\n",
+            "title": "",
+            "metadata": {
+              "truncated": false
+            },
+            "time": {
+              "start": 1772797199702,
+              "end": 1772797199729
+            }
+          },
+          "id": "REDACTED",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f25f80001HBX9dzLy98ROgZ"
+        },
+        {
+          "type": "step-finish",
+          "reason": "tool-calls",
+          "snapshot": "6399ad49479349f316ae03b13c4d50d8a8039b1b",
+          "cost": 0.0357685,
+          "tokens": {
+            "total": 42368,
+            "input": 1,
+            "output": 543,
+            "reasoning": 0,
+            "cache": {
+              "read": 41602,
+              "write": 222
+            }
+          },
+          "id": "prt_cc2f28573001zCT53dA7dALrPd",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f25f80001HBX9dzLy98ROgZ"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1772797199775,
+          "completed": 1772797202672
+        },
+        "parentID": "REDACTED",
+        "modelID": "claude-opus-4-6",
+        "providerID": "anthropic",
+        "mode": "Sisyphus (Ultraworker)",
+        "agent": "Sisyphus (Ultraworker)",
+        "path": {
+          "cwd": "/home/mbajaj/src/personal/mcp-skill",
+          "root": "/home/mbajaj/src/personal/mcp-skill"
+        },
+        "cost": 0.0337295,
+        "tokens": {
+          "total": 43638,
+          "input": 1,
+          "output": 79,
+          "reasoning": 0,
+          "cache": {
+            "read": 41824,
+            "write": 1734
+          }
+        },
+        "variant": "max",
+        "finish": "tool-calls",
+        "id": "msg_cc2f2859f001iVs2NP49YWLEbW",
+        "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "snapshot": "6399ad49479349f316ae03b13c4d50d8a8039b1b",
+          "id": "prt_cc2f28eaa001fd8ZvruZLzO06B",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f2859f001iVs2NP49YWLEbW"
+        },
+        {
+          "type": "tool",
+          "callID": "REDACTED",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/type_mapper.py"
+            },
+            "output": "<path>/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/type_mapper.py</path>\n<type>file</type>\n<content>1: \"\"\"JSON Schema to Python type string conversion.\"\"\"\n2: from typing import Any\n3: import re\n4: import keyword\n5: \n6: \n7: _SIMPLE_TYPE_MAP: dict[str, str] = {\n8:     \"string\": \"str\",\n9:     \"integer\": \"int\",\n10:     \"number\": \"float\",\n11:     \"boolean\": \"bool\",\n12:     \"null\": \"None\",\n13: }\n14: \n15: \n16: def schema_to_python_type(schema: dict[str, Any]) -> str:\n17:     \"\"\"Convert a JSON Schema to a Python type annotation string.\"\"\"\n18:     if not schema:\n19:         return \"Any\"\n20: \n21:     if \"$ref\" in schema:\n22:         return \"dict[str, Any]\"\n23: \n24:     if \"enum\" in schema:\n25:         return \"str\"\n26: \n27:     for key in (\"anyOf\", \"oneOf\"):\n28:         if key in schema:\n29:             variants = schema[key]\n30:             null_types = [v for v in variants if v.get(\"type\") == \"null\"]\n31:             non_null = [v for v in variants if v.get(\"type\") != \"null\"]\n32:             has_none = len(null_types) > 0\n33: \n34:             if not non_null:\n35:                 return \"None\"\n36: \n37:             parts = [schema_to_python_type(v) for v in non_null]\n38:             seen: set[str] = set()\n39:             unique: list[str] = []\n40:             for p in parts:\n41:                 if p not in seen:\n42:                     seen.add(p)\n43:                     unique.append(p)\n44: \n45:             if has_none:\n46:                 unique.append(\"None\")\n47: \n48:             return \" | \".join(unique)\n49: \n50:     schema_type = schema.get(\"type\")\n51: \n52:     if isinstance(schema_type, list):\n53:         null_types = [t for t in schema_type if t == \"null\"]\n54:         non_null = [t for t in schema_type if t != \"null\"]\n55:         has_none = len(null_types) > 0\n56: \n57:         if not non_null:\n58:             return \"None\"\n59: \n60:         parts = [_SIMPLE_TYPE_MAP.get(t, \"Any\") for t in non_null]\n61:         if has_none:\n62:             parts.append(\"None\")\n63:         return \" | \".join(parts)\n64: \n65:     if isinstance(schema_type, str):\n66:         if schema_type in _SIMPLE_TYPE_MAP:\n67:             return _SIMPLE_TYPE_MAP[schema_type]\n68: \n69:         if schema_type == \"object\":\n70:             return \"dict[str, Any]\"\n71: \n72:         if schema_type == \"array\":\n73:             items = schema.get(\"items\")\n74:             if isinstance(items, dict):\n75:                 item_type = items.get(\"type\")\n76:                 if isinstance(item_type, str) and item_type in _SIMPLE_TYPE_MAP:\n77:                     return f\"list[{_SIMPLE_TYPE_MAP[item_type]}]\"\n78:                 return \"list[Any]\"\n79:             return \"list[Any]\"\n80: \n81:     return \"Any\"\n82: \n83: \n84: def to_python_identifier(name: str, existing: set[str]) -> str:\n85:     \"\"\"Convert a name to a valid Python identifier.\"\"\"\n86:     safe = re.sub(r\"[^a-zA-Z0-9_]\", \"_\", name)\n87:     if safe and safe[0].isdigit():\n88:         safe = f\"_{safe}\"\n89:     safe = safe or \"_unnamed\"\n90:     if keyword.iskeyword(safe):\n91:         safe = f\"{safe}_\"\n92:     base = safe\n93:     counter = 2\n94:     while safe in existing:\n95:         safe = f\"{base}_{counter}\"\n96:         counter += 1\n97:     existing.add(safe)\n98:     return safe\n99: \n100: \n101: def extract_params(input_schema: dict[str, Any]) -> list[dict]:\n102:     \"\"\"Extract parameter info from a tool's inputSchema.\"\"\"\n103:     properties = input_schema.get(\"properties\", {})\n104:     required = input_schema.get(\"required\", [])\n105: \n106:     params: list[dict] = []\n107:     for prop_name, prop_schema in properties.items():\n108:         is_required = prop_name in required\n109:         param: dict[str, Any] = {\n110:             \"name\": prop_name,\n111:             \"type\": schema_to_python_type(prop_schema),\n112:             \"description\": prop_schema.get(\"description\", \"\"),\n113:             \"required\": is_required,\n114:         }\n115:         if not is_required:\n116:             param[\"default\"] = None\n117:         params.append(param)\n118: \n119:     params.sort(key=lambda p: (not p[\"required\"], p[\"name\"]))\n120:     return params\n121: \n122: \n123: def derive_class_name(server_name: str) -> str:\n124:     \"\"\"Convert server name to PascalCase class name.\"\"\"\n125:     if not server_name or not server_name.strip():\n126:         return \"McpApp\"\n127:     \n128:     words = re.split(r'[\\s\\-_\\.]+', server_name.strip())\n129:     words = [word.capitalize() for word in words if word]\n130:     \n131:     if not words:\n132:         return \"McpApp\"\n133:     \n134:     name = ''.join(words) + \"App\"\n135:     # Ensure the name is a valid Python identifier (can't start with a digit)\n136:     if name and name[0].isdigit():\n137:         name = \"Mcp\" + name\n138:     return name\n139: \n140: \n141: def derive_module_name(skill_name: str) -> str:\n142:     \"\"\"Convert a skill name to a valid Python module/folder name.\"\"\"\n143:     if not skill_name or not skill_name.strip():\n144:         return \"mcp_skill\"\n145: \n146:     name = re.sub(r'[^a-zA-Z0-9_]', '_', skill_name.strip())\n147:     name = re.sub(r'_+', '_', name)\n148:     name = name.strip('_').lower()\n149: \n150:     if not name:\n151:         return \"mcp_skill\"\n152:     if name[0].isdigit():\n153:         name = f\"mcp_{name}\"\n154:     if keyword.iskeyword(name):\n155:         name = f\"{name}_\"\n156: \n157:     return name\n158: \n159: \n160: def derive_skill_name(server_name: str) -> str:\n161:     \"\"\"Convert server name to agentskills.io-compliant skill name.\"\"\"\n162:     if not server_name or not server_name.strip():\n163:         return \"mcp-skill\"\n164:     \n165:     name = server_name.lower()\n166:     name = re.sub(r'[\\s_\\.]+', '-', name)\n167:     name = re.sub(r'[^a-z0-9-]', '', name)\n168:     name = re.sub(r'-+', '-', name)\n169:     name = name.strip('-')\n170:     \n171:     if len(name) > 64:\n172:         name = name[:64].rstrip('-')\n173:     \n174:     if not name:\n175:         return \"mcp-skill\"\n176:     \n177:     return name\n178: \n179: \n180: def generate_skill_description(server_name: str, tools: list) -> str:\n181:     \"\"\"Generate a description for the skill.\"\"\"\n182:     if not tools:\n183:         return f\"MCP skill for {server_name}. No tools available.\"\n184:     \n185:     tool_names = [tool.name for tool in tools]\n186:     tool_count = len(tool_names)\n187:     \n188:     base = f\"MCP skill for {server_name}. Provides {tool_count} tools: \"\n189:     tools_str = \", \".join(tool_names)\n190:     full_desc = base + tools_str\n191:     \n192:     if len(full_desc) > 1024:\n193:         max_tools_len = 1024 - len(base) - 3\n194:         if max_tools_len <= 0:\n195:             return full_desc[:1021] + \"...\"\n196:         \n197:         tools_list = []\n198:         current_len = 0\n199:         for name in tool_names:\n200:             sep_len = 2 if tools_list else 0\n201:             if current_len + sep_len + len(name) <= max_tools_len:\n202:                 tools_list.append(name)\n203:                 current_len += sep_len + len(name)\n204:             else:\n205:                 break\n206:         \n207:         tools_str = \", \".join(tools_list) + \"...\"\n208:         full_desc = base + tools_str\n209:     \n210:     return full_desc\n\n(End of file - total 210 lines)\n</content>",
+            "title": "src/mcp_skill/type_mapper.py",
+            "metadata": {
+              "preview": "\"\"\"JSON Schema to Python type string conversion.\"\"\"\nfrom typing import Any\nimport re\nimport keyword\n\n\n_SIMPLE_TYPE_MAP: dict[str, str] = {\n    \"string\": \"str\",\n    \"integer\": \"int\",\n    \"number\": \"float\",\n    \"boolean\": \"bool\",\n    \"null\": \"None\",\n}\n\n\ndef schema_to_python_type(schema: dict[str, Any]) -> str:\n    \"\"\"Convert a JSON Schema to a Python type annotation string.\"\"\"\n    if not schema:\n        return \"Any\"\n",
+              "truncated": false,
+              "loaded": []
+            },
+            "time": {
+              "start": 1772797202598,
+              "end": 1772797202627
+            }
+          },
+          "id": "prt_cc2f28eab001LyPTd05eohakWV",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f2859f001iVs2NP49YWLEbW"
+        },
+        {
+          "type": "step-finish",
+          "reason": "tool-calls",
+          "snapshot": "6399ad49479349f316ae03b13c4d50d8a8039b1b",
+          "cost": 0.0337295,
+          "tokens": {
+            "total": 43638,
+            "input": 1,
+            "output": 79,
+            "reasoning": 0,
+            "cache": {
+              "read": 41824,
+              "write": 1734
+            }
+          },
+          "id": "prt_cc2f290c5001wrt6FLlmEKO70A",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f2859f001iVs2NP49YWLEbW"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1772797202679,
+          "completed": 1772797216006
+        },
+        "parentID": "REDACTED",
+        "modelID": "claude-opus-4-6",
+        "providerID": "anthropic",
+        "mode": "Sisyphus (Ultraworker)",
+        "agent": "Sisyphus (Ultraworker)",
+        "path": {
+          "cwd": "/home/mbajaj/src/personal/mcp-skill",
+          "root": "/home/mbajaj/src/personal/mcp-skill"
+        },
+        "cost": 0.054034,
+        "tokens": {
+          "total": 46784,
+          "input": 1,
+          "output": 645,
+          "reasoning": 0,
+          "cache": {
+            "read": 43558,
+            "write": 2580
+          }
+        },
+        "variant": "max",
+        "finish": "tool-calls",
+        "id": "msg_cc2f290f70018aa7t4ly5EcgT9",
+        "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "snapshot": "6399ad49479349f316ae03b13c4d50d8a8039b1b",
+          "id": "REDACTED",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f290f70018aa7t4ly5EcgT9"
+        },
+        {
+          "type": "reasoning",
+          "text": "Good. Everything checks out:\n\n1. **Directory structure**: CLI writes to `.agents/skills/<module_name>/` with `__init__.py`, `app.py`, `SKILL.md` at root — matches README ✓\n2. **Module name**: `derive_module_name(\"parallel-search\")` → `parallel_search` — matches README ✓\n3. **Class name**: `derive_class_name(\"Parallel\")` → `ParallelApp` — matches README ✓\n4. **Token storage**: `~/.mcp-skill/<skill_name>/api-tokens/` — README says `~/.mcp-skill/<name>/` which is correct ✓\n\n\n5. **Auth types**: bearer, header, oauth, none — matches README ✓\n6. **Import style**: `from <skill>.app import <Class>` — matches README ✓\n\nI need to revert the Motivation section link back to the original Claude cookbook URL instead of the OpenAI docs I accidentally switched it to.",
+          "metadata": {
+            "anthropic": {
+              "signature": "REDACTED/s+P0em9cg4d5R4czt+WolRI8PWoyogSib/VGlElfTPKIo2dtgYAVOH/REDACTED/REDACTED/REDACTED/REDACTED/e/REDACTED/BYx3tFh2TdZBaRjbvdGAAn/REDACTED/REDACTED/REDACTED/3dE+xq6F5Y4sO1tRDvj1/vMurk9FLAO8IU/Crb78ScFycUpj+3amv/qzL7NxHpTf9Nn85xf8Tr0/3QRlwINDsEn/PWveJjyffBDEuDwb7VxhugqHg//9/REDACTED/OmnazrE0gkeJ4lUs/REDACTED/Rsw0symdBo+XAgZVIT/8ZH/REDACTED/mpVhle5nf1bn/REDACTED/REDACTED/REDACTED/08ZqDH0Br5ITorUpm/REDACTED/T4XIUAxq7sXA5fVfS5z5pO7/REDACTED/vbsB/REDACTED/Vu/dS86WAkkCXq4m2nBldkal3nhQIPy/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/atAXjhCTtMGAE="
+            }
+          },
+          "time": {
+            "start": 1772797205419,
+            "end": 1772797214304
+          },
+          "id": "prt_cc2f29bab001kHOh10jkFG6qNg",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f290f70018aa7t4ly5EcgT9"
+        },
+        {
+          "type": "text",
+          "text": "I spotted an error — the PTC link in the Motivation section should point to Anthropic's cookbook, not OpenAI. Let me fix:",
+          "time": {
+            "start": 1772797214798,
+            "end": 1772797214798
+          },
+          "id": "prt_cc2f2be620013Nn2T0JQYg9Hk2",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f290f70018aa7t4ly5EcgT9"
+        },
+        {
+          "type": "tool",
+          "callID": "toolu_01QWLoAMD8YTwdDLt5tDAVrE",
+          "tool": "edit",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/home/mbajaj/src/personal/mcp-skill/README.md",
+              "oldString": "[Programmatic Tool Calling](https://platform.openai.com/docs/guides/tools) fixes this",
+              "newString": "[Programmatic Tool Calling](https://platform.claude.com/cookbook/tool-use-programmatic-tool-calling-ptc) fixes this"
+            },
+            "output": "Edit applied successfully.",
+            "title": "README.md",
+            "metadata": {
+              "diagnostics": {
+                "/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/generator.py": [],
+                "/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/cli.py": [],
+                "/home/mbajaj/src/personal/mcp-skill/src/mcp_skill/type_mapper.py": []
+              },
+              "diff": "Index: /home/mbajaj/src/personal/mcp-skill/README.md\n===================================================================\n--- /home/mbajaj/src/personal/mcp-skill/README.md\n+++ /home/mbajaj/src/personal/mcp-skill/README.md\n@@ -56,9 +56,9 @@\n ## Motivation\n \n MCP servers give agents access to tools, but every tool call round-trips through the model — request tool, execute, full result back into context, decide next step. For large payloads or sequential calls, this burns tokens and adds latency.\n \n-[Programmatic Tool Calling](https://platform.openai.com/docs/guides/tools) fixes this: the agent writes code that calls tools directly, without model round-trips per invocation. Fetch, filter, aggregate — all in one code block.\n+[Programmatic Tool Calling](https://platform.claude.com/cookbook/tool-use-programmatic-tool-calling-ptc) fixes this: the agent writes code that calls tools directly, without model round-trips per invocation. Fetch, filter, aggregate — all in one code block.\n \n **mcp-skill** makes this possible by compiling any MCP server into a plain Python class. Each tool becomes a typed async method. The agent just writes Python.\n \n ```python\n",
+              "filediff": {
+                "file": "/home/mbajaj/src/personal/mcp-skill/README.md",
+                "before": "# mcp-skill\n\nTurn any MCP server into a typed Python SDK.\n\n> **Compile MCP tools into code.**\n\n`mcp-skill` introspects an MCP server and generates a Python class where each tool becomes a typed async method.\n\n## Before and After\n\n### Before\n\nAgents call MCP tools through the model loop — one round-trip per tool call:\n\n```\nllm.call_tool(\"web_search_preview\", {\"query\": \"...\"})\n# → model decides next step → calls another tool → model decides again → ...\n```\n\n### After\n\nAgents call tools directly in code:\n\n```python\nresult = await app.web_search_preview(\n    objective=\"find latest news\",\n    search_queries=[\"topic X 2026\"]\n)\n# Agent processes result in code — no round-trip back to model\n```\n\n## How It Works\n\n```\n┌─────────────┐      ┌───────────────┐      ┌────────────────────┐\n│  MCP Server  │─────▶│  mcp-skill    │─────▶│  Generated Skill   │\n│  (any URL)   │      │  CLI          │      │                    │\n│              │      │               │      │  app.py            │\n│  Tools:      │      │  1. Connect   │      │  ├─ Typed class    │\n│  - search    │      │  2. Introspec │      │  ├─ Async methods  │\n│  - fetch     │      │  3. Map types │      │  ├─ Auth + storage │\n│  - ...       │      │  4. Generate  │      │  └─ JSON parsing   │\n│              │      │  5. Validate  │      │                    │\n└─────────────┘      └───────────────┘      │  SKILL.md          │\n                                             │  └─ Agent docs     │\n                                             └────────────────────┘\n```\n\n1. Connects to the MCP server using [fastmcp](https://github.com/jlowin/fastmcp)\n2. Introspects all available tools via `list_tools()`\n3. Converts each tool's JSON Schema into Python type annotations\n4. Generates a typed `App` class where each MCP tool becomes an `async` method\n5. Validates the output with `ast.parse` → `ruff` → `ty`\n6. Generates `SKILL.md` with tool documentation and usage examples for agents\n\n## Motivation\n\nMCP servers give agents access to tools, but every tool call round-trips through the model — request tool, execute, full result back into context, decide next step. For large payloads or sequential calls, this burns tokens and adds latency.\n\n[Programmatic Tool Calling](https://platform.openai.com/docs/guides/tools) fixes this: the agent writes code that calls tools directly, without model round-trips per invocation. Fetch, filter, aggregate — all in one code block.\n\n**mcp-skill** makes this possible by compiling any MCP server into a plain Python class. Each tool becomes a typed async method. The agent just writes Python.\n\n```python\nfrom parallel_search.app import ParallelApp\n\napp = ParallelApp(auth=\"sk-...\")\nresult = await app.web_search_preview(\n    objective=\"find latest news on topic X\",\n    search_queries=[\"topic X 2026\"]\n)\n```\n\n## Setup\n\n```bash\n# Install with uv\nuv pip install -e .\n\n# Or use directly\nuv run mcp-skill create --url https://your-mcp-server.com/mcp --auth api-key\n```\n\nRequires [uv](https://github.com/astral-sh/uv) and Python 3.10+.\n\n## Usage\n\n```bash\n# Interactive mode — prompts for URL, auth type, etc.\nmcp-skill create\n\n# Non-interactive mode\nmcp-skill create \\\n  --url https://search-mcp.parallel.ai/mcp \\\n  --auth api-key \\\n  --api-key YOUR_KEY \\\n  --name parallel-search \\\n  --non-interactive\n```\n\n### Generated Output\n\nThe skill lands in `.agents/skills/<name>/` as a Python package:\n\n```\n.agents/skills/parallel_search/\n├── __init__.py\n├── app.py          # Typed Python class wrapping the MCP server\n└── SKILL.md        # Agent-facing docs, dependencies, and usage\n```\n\nHere's what the generated `app.py` looks like:\n\n```python\nclass ParallelApp:\n\n    def __init__(self, url: str = \"https://...\", auth=None) -> None:\n        ...\n\n    async def web_search_preview(\n        self,\n        objective: str,\n        search_queries: list[str],\n    ) -> dict[str, Any]:\n        \"\"\"Search the web with multiple queries in parallel.\"\"\"\n        ...\n\n    async def fetch_url(\n        self,\n        url: str,\n        max_length: int = None,\n    ) -> dict[str, Any]:\n        \"\"\"Fetch and extract content from a URL.\"\"\"\n        ...\n\n    def list_tools(self):\n        return [self.web_search_preview, self.fetch_url]\n```\n\nEach method connects to the MCP server, calls the underlying tool, and returns parsed JSON. Auth credentials are persisted to disk (`~/.mcp-skill/<name>/`) after first use — provide once, reuse automatically.\n\n## Who Is This For?\n\nDevelopers building:\n\n- **MCP-based agents** that need direct tool access without model round-trips\n- **Automation systems** using MCP tools as programmatic building blocks\n- **Code-execution agents** using [Programmatic Tool Calling](https://platform.claude.com/cookbook/tool-use-programmatic-tool-calling-ptc)\n\n## Current Limitations\n\n- **Auth**: Supports API key (Bearer or custom header), OAuth, and none — no mTLS or complex auth flows\n- **Runtime dependency**: Generated code depends on [fastmcp](https://github.com/jlowin/fastmcp) for MCP client connections\n- **Connection per call**: Each method creates a new MCP client connection (no pooling)\n- **Tools only**: MCP resources and prompts not yet supported\n\n## Task List\n\nTracked improvements based on real-world usage:\n\n- [x] **Fix output directory path** — Changed from `.agents/skill/<name>` to `.agents/skills/<name>`\n- [x] **Add dependency info to SKILL.md** — Dependencies listed with `uv` and `pip` install commands\n- [x] **Generate `__init__.py`** — Skill directory is a proper Python package\n- [x] **Post-generation validation** — `ast.parse` → `ruff check` → `ty check` with `uvx` fallback\n- [x] **Package-style imports** — Moved `app.py` to skill root; import via `from <skill>.app import <Class>`\n- [x] **Persistent token storage** — Disk-backed credential storage at `~/.mcp-skill/<name>/`\n- [x] **Unified auth signature** — All auth types use `auth=None` in `__init__`\n- [x] **Sanitize skill names** — Hyphens/dots converted to underscores for valid Python identifiers\n- [ ] **Support MCP resources and prompts** — Currently only tools are introspected and generated\n",
+                "after": "# mcp-skill\n\nTurn any MCP server into a typed Python SDK.\n\n> **Compile MCP tools into code.**\n\n`mcp-skill` introspects an MCP server and generates a Python class where each tool becomes a typed async method.\n\n## Before and After\n\n### Before\n\nAgents call MCP tools through the model loop — one round-trip per tool call:\n\n```\nllm.call_tool(\"web_search_preview\", {\"query\": \"...\"})\n# → model decides next step → calls another tool → model decides again → ...\n```\n\n### After\n\nAgents call tools directly in code:\n\n```python\nresult = await app.web_search_preview(\n    objective=\"find latest news\",\n    search_queries=[\"topic X 2026\"]\n)\n# Agent processes result in code — no round-trip back to model\n```\n\n## How It Works\n\n```\n┌─────────────┐      ┌───────────────┐      ┌────────────────────┐\n│  MCP Server  │─────▶│  mcp-skill    │─────▶│  Generated Skill   │\n│  (any URL)   │      │  CLI          │      │                    │\n│              │      │               │      │  app.py            │\n│  Tools:      │      │  1. Connect   │      │  ├─ Typed class    │\n│  - search    │      │  2. Introspec │      │  ├─ Async methods  │\n│  - fetch     │      │  3. Map types │      │  ├─ Auth + storage │\n│  - ...       │      │  4. Generate  │      │  └─ JSON parsing   │\n│              │      │  5. Validate  │      │                    │\n└─────────────┘      └───────────────┘      │  SKILL.md          │\n                                             │  └─ Agent docs     │\n                                             └────────────────────┘\n```\n\n1. Connects to the MCP server using [fastmcp](https://github.com/jlowin/fastmcp)\n2. Introspects all available tools via `list_tools()`\n3. Converts each tool's JSON Schema into Python type annotations\n4. Generates a typed `App` class where each MCP tool becomes an `async` method\n5. Validates the output with `ast.parse` → `ruff` → `ty`\n6. Generates `SKILL.md` with tool documentation and usage examples for agents\n\n## Motivation\n\nMCP servers give agents access to tools, but every tool call round-trips through the model — request tool, execute, full result back into context, decide next step. For large payloads or sequential calls, this burns tokens and adds latency.\n\n[Programmatic Tool Calling](https://platform.claude.com/cookbook/tool-use-programmatic-tool-calling-ptc) fixes this: the agent writes code that calls tools directly, without model round-trips per invocation. Fetch, filter, aggregate — all in one code block.\n\n**mcp-skill** makes this possible by compiling any MCP server into a plain Python class. Each tool becomes a typed async method. The agent just writes Python.\n\n```python\nfrom parallel_search.app import ParallelApp\n\napp = ParallelApp(auth=\"sk-...\")\nresult = await app.web_search_preview(\n    objective=\"find latest news on topic X\",\n    search_queries=[\"topic X 2026\"]\n)\n```\n\n## Setup\n\n```bash\n# Install with uv\nuv pip install -e .\n\n# Or use directly\nuv run mcp-skill create --url https://your-mcp-server.com/mcp --auth api-key\n```\n\nRequires [uv](https://github.com/astral-sh/uv) and Python 3.10+.\n\n## Usage\n\n```bash\n# Interactive mode — prompts for URL, auth type, etc.\nmcp-skill create\n\n# Non-interactive mode\nmcp-skill create \\\n  --url https://search-mcp.parallel.ai/mcp \\\n  --auth api-key \\\n  --api-key YOUR_KEY \\\n  --name parallel-search \\\n  --non-interactive\n```\n\n### Generated Output\n\nThe skill lands in `.agents/skills/<name>/` as a Python package:\n\n```\n.agents/skills/parallel_search/\n├── __init__.py\n├── app.py          # Typed Python class wrapping the MCP server\n└── SKILL.md        # Agent-facing docs, dependencies, and usage\n```\n\nHere's what the generated `app.py` looks like:\n\n```python\nclass ParallelApp:\n\n    def __init__(self, url: str = \"https://...\", auth=None) -> None:\n        ...\n\n    async def web_search_preview(\n        self,\n        objective: str,\n        search_queries: list[str],\n    ) -> dict[str, Any]:\n        \"\"\"Search the web with multiple queries in parallel.\"\"\"\n        ...\n\n    async def fetch_url(\n        self,\n        url: str,\n        max_length: int = None,\n    ) -> dict[str, Any]:\n        \"\"\"Fetch and extract content from a URL.\"\"\"\n        ...\n\n    def list_tools(self):\n        return [self.web_search_preview, self.fetch_url]\n```\n\nEach method connects to the MCP server, calls the underlying tool, and returns parsed JSON. Auth credentials are persisted to disk (`~/.mcp-skill/<name>/`) after first use — provide once, reuse automatically.\n\n## Who Is This For?\n\nDevelopers building:\n\n- **MCP-based agents** that need direct tool access without model round-trips\n- **Automation systems** using MCP tools as programmatic building blocks\n- **Code-execution agents** using [Programmatic Tool Calling](https://platform.claude.com/cookbook/tool-use-programmatic-tool-calling-ptc)\n\n## Current Limitations\n\n- **Auth**: Supports API key (Bearer or custom header), OAuth, and none — no mTLS or complex auth flows\n- **Runtime dependency**: Generated code depends on [fastmcp](https://github.com/jlowin/fastmcp) for MCP client connections\n- **Connection per call**: Each method creates a new MCP client connection (no pooling)\n- **Tools only**: MCP resources and prompts not yet supported\n\n## Task List\n\nTracked improvements based on real-world usage:\n\n- [x] **Fix output directory path** — Changed from `.agents/skill/<name>` to `.agents/skills/<name>`\n- [x] **Add dependency info to SKILL.md** — Dependencies listed with `uv` and `pip` install commands\n- [x] **Generate `__init__.py`** — Skill directory is a proper Python package\n- [x] **Post-generation validation** — `ast.parse` → `ruff check` → `ty check` with `uvx` fallback\n- [x] **Package-style imports** — Moved `app.py` to skill root; import via `from <skill>.app import <Class>`\n- [x] **Persistent token storage** — Disk-backed credential storage at `~/.mcp-skill/<name>/`\n- [x] **Unified auth signature** — All auth types use `auth=None` in `__init__`\n- [x] **Sanitize skill names** — Hyphens/dots converted to underscores for valid Python identifiers\n- [ ] **Support MCP resources and prompts** — Currently only tools are introspected and generated\n",
+                "additions": 1,
+                "deletions": 1
+              },
+              "truncated": false
+            },
+            "time": {
+              "start": 1772797215899,
+              "end": 1772797215943
+            }
+          },
+          "id": "prt_cc2f2c050001UOxY4855rE465k",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f290f70018aa7t4ly5EcgT9"
+        },
+        {
+          "type": "step-finish",
+          "reason": "tool-calls",
+          "snapshot": "9ac5c7679c7cc5f7d048c9fa504a743ad358c630",
+          "cost": 0.054034,
+          "tokens": {
+            "total": 46784,
+            "input": 1,
+            "output": 645,
+            "reasoning": 0,
+            "cache": {
+              "read": 43558,
+              "write": 2580
+            }
+          },
+          "id": "prt_cc2f2c4e4001d4Rp4PVZ17y0uT",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f290f70018aa7t4ly5EcgT9"
+        },
+        {
+          "type": "patch",
+          "hash": "6399ad49479349f316ae03b13c4d50d8a8039b1b",
+          "files": [
+            "/home/mbajaj/src/personal/mcp-skill/README.md"
+          ],
+          "id": "prt_cc2f2c502001CJUaz6EegQwoFa",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f290f70018aa7t4ly5EcgT9"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1772797216011,
+          "completed": 1772797220327
+        },
+        "parentID": "REDACTED",
+        "modelID": "claude-opus-4-6",
+        "providerID": "anthropic",
+        "mode": "Sisyphus (Ultraworker)",
+        "agent": "Sisyphus (Ultraworker)",
+        "path": {
+          "cwd": "/home/mbajaj/src/personal/mcp-skill",
+          "root": "/home/mbajaj/src/personal/mcp-skill"
+        },
+        "cost": 0.03008025,
+        "tokens": {
+          "total": 46909,
+          "input": 1,
+          "output": 117,
+          "reasoning": 0,
+          "cache": {
+            "read": 46138,
+            "write": 653
+          }
+        },
+        "variant": "max",
+        "finish": "tool-calls",
+        "id": "msg_cc2f2c50b0013o5VAriXtxGt9d",
+        "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "snapshot": "9ac5c7679c7cc5f7d048c9fa504a743ad358c630",
+          "id": "prt_cc2f2cea0001wRlzuM12AHDirc",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f2c50b0013o5VAriXtxGt9d"
+        },
+        {
+          "type": "tool",
+          "callID": "REDACTED",
+          "tool": "todowrite",
+          "state": {
+            "status": "completed",
+            "input": {
+              "todos": [
+                {
+                  "content": "Rewrite README.md with all user suggestions + git history accuracy",
+                  "status": "completed",
+                  "priority": "high"
+                },
+                {
+                  "content": "Verify README accuracy against actual codebase (structure, imports, auth)",
+                  "status": "completed",
+                  "priority": "high"
+                }
+              ]
+            },
+            "output": "[\n  {\n    \"content\": \"Rewrite README.md with all user suggestions + git history accuracy\",\n    \"status\": \"completed\",\n    \"priority\": \"high\"\n  },\n  {\n    \"content\": \"Verify README accuracy against actual codebase (structure, imports, auth)\",\n    \"status\": \"completed\",\n    \"priority\": \"high\"\n  }\n]",
+            "title": "0 todos",
+            "metadata": {
+              "todos": [
+                {
+                  "content": "Rewrite README.md with all user suggestions + git history accuracy",
+                  "status": "completed",
+                  "priority": "high"
+                },
+                {
+                  "content": "Verify README accuracy against actual codebase (structure, imports, auth)",
+                  "status": "completed",
+                  "priority": "high"
+                }
+              ],
+              "truncated": false
+            },
+            "time": {
+              "start": 1772797220249,
+              "end": 1772797220293
+            }
+          },
+          "id": "prt_cc2f2cea1001oENig9qdzJNIvz",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f2c50b0013o5VAriXtxGt9d"
+        },
+        {
+          "type": "step-finish",
+          "reason": "tool-calls",
+          "snapshot": "9ac5c7679c7cc5f7d048c9fa504a743ad358c630",
+          "cost": 0.03008025,
+          "tokens": {
+            "total": 46909,
+            "input": 1,
+            "output": 117,
+            "reasoning": 0,
+            "cache": {
+              "read": 46138,
+              "write": 653
+            }
+          },
+          "id": "prt_cc2f2d5c60014bhk3U09Ez3t14",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f2c50b0013o5VAriXtxGt9d"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1772797220331,
+          "completed": 1772797232460
+        },
+        "parentID": "REDACTED",
+        "modelID": "claude-opus-4-6",
+        "providerID": "anthropic",
+        "mode": "Sisyphus (Ultraworker)",
+        "agent": "Sisyphus (Ultraworker)",
+        "path": {
+          "cwd": "/home/mbajaj/src/personal/mcp-skill",
+          "root": "/home/mbajaj/src/personal/mcp-skill"
+        },
+        "cost": 0.033213,
+        "tokens": {
+          "total": 47348,
+          "input": 1,
+          "output": 338,
+          "reasoning": 0,
+          "cache": {
+            "read": 46791,
+            "write": 218
+          }
+        },
+        "variant": "max",
+        "finish": "stop",
+        "id": "msg_cc2f2d5eb001GxrFM1DImGUJ1H",
+        "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "snapshot": "9ac5c7679c7cc5f7d048c9fa504a743ad358c630",
+          "id": "prt_cc2f2de7a001mOyvTLW6ztv7Et",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f2d5eb001GxrFM1DImGUJ1H"
+        },
+        {
+          "type": "text",
+          "text": "Done. Here's what changed:\n\n**Applied your suggestions:**\n- **Hook**: New title — \"Turn any MCP server into a typed Python SDK\"\n- **Tagline**: \"Compile MCP tools into code.\" as a blockquote right under the title\n- **Before/After**: Shows model-loop vs direct code call\n- **Diagram**: ASCII flow showing MCP Server → CLI → Generated Skill\n- **Motivation**: Cut from 3 paragraphs to 2, crisper\n- **Generated Output**: Directory tree + `app.py` snippet showing `ParallelApp` with typed methods\n- **Who Is This For**: New section — MCP agents, automation systems, PTC agents\n- **Current Limitations**: Updated to reflect actual state (auth types, fastmcp dep, connection per call, tools only)\n\n**Updated from git history:**\n- Fixed directory structure — flat package (`app.py` at root, no `scripts/` subdir) per commit `a88774d`\n- Fixed import path — `from parallel_search.app import ParallelApp` per commits `a88774d` + `afba3b6`\n- Added persistent token storage mention per commit `531e402`\n- Updated `auth=None` signature per commit `99bd4ef`\n- Added validation step to \"How It Works\" per commit `516218b`\n- Updated task list with 4 new completed items (package imports, token storage, unified auth, name sanitization)",
+          "time": {
+            "start": 1772797232412,
+            "end": 1772797232412
+          },
+          "id": "prt_cc2f2de7c001uyiG1eMuEDoqcr",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f2d5eb001GxrFM1DImGUJ1H"
+        },
+        {
+          "type": "step-finish",
+          "reason": "stop",
+          "snapshot": "9ac5c7679c7cc5f7d048c9fa504a743ad358c630",
+          "cost": 0.033213,
+          "tokens": {
+            "total": 47348,
+            "input": 1,
+            "output": 338,
+            "reasoning": 0,
+            "cache": {
+              "read": 46791,
+              "write": 218
+            }
+          },
+          "id": "prt_cc2f30526001L0iUKylrcVYRX3",
+          "sessionID": "ses_33d0f7259ffePVLucZmTJdlaj5",
+          "messageID": "msg_cc2f2d5eb001GxrFM1DImGUJ1H"
+        }
+      ]
+    }
+  ]
+}
