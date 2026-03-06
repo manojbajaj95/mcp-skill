@@ -9,7 +9,7 @@ from pathlib import Path
 
 from mcp_skill.introspector import connect_and_list_tools
 from mcp_skill.generator import generate_app_py, generate_skill_md
-from mcp_skill.type_mapper import derive_class_name, derive_skill_name, generate_skill_description
+from mcp_skill.type_mapper import derive_class_name, derive_module_name, derive_skill_name, generate_skill_description
 from mcp_skill.validator import validate_generated_code
 
 
@@ -104,7 +104,8 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
                 default_app = server_name.capitalize()
                 app_name = click.prompt("App name (base name, 'App' suffix added automatically)", default=default_app)
 
-        output_dir = os.path.join(".agents", "skills", name)
+        module_name = derive_module_name(name)
+        output_dir = os.path.join(".agents", "skills", module_name)
         if os.path.exists(output_dir):
             if not force:
                 if non_interactive:
@@ -123,11 +124,12 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
         app_code = generate_app_py(
             class_name, url, tools,
             auth_type=auth_type, auth_header=auth_header,
-            skill_name=name,
+            skill_name=name, module_name=module_name,
         )
         skill_md = generate_skill_md(
             name, description, tools, class_name,
             auth_type=auth_type, auth_header=auth_header,
+            module_name=module_name,
         )
 
         os.makedirs(output_dir, exist_ok=True)

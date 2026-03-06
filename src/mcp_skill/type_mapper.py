@@ -138,6 +138,25 @@ def derive_class_name(server_name: str) -> str:
     return name
 
 
+def derive_module_name(skill_name: str) -> str:
+    """Convert a skill name to a valid Python module/folder name."""
+    if not skill_name or not skill_name.strip():
+        return "mcp_skill"
+
+    name = re.sub(r'[^a-zA-Z0-9_]', '_', skill_name.strip())
+    name = re.sub(r'_+', '_', name)
+    name = name.strip('_').lower()
+
+    if not name:
+        return "mcp_skill"
+    if name[0].isdigit():
+        name = f"mcp_{name}"
+    if keyword.iskeyword(name):
+        name = f"{name}_"
+
+    return name
+
+
 def derive_skill_name(server_name: str) -> str:
     """Convert server name to agentskills.io-compliant skill name."""
     if not server_name or not server_name.strip():

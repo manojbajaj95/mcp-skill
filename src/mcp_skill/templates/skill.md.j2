@@ -89,7 +89,7 @@ pip install {{ dependencies | join(" ") }}
 ```python
 import sys
 sys.path.insert(0, ".agents/skills")
-from {{ skill_name }}.app import {{ class_name }}
+from {{ module_name }}.app import {{ class_name }}
 ```
 
 Or set the `PYTHONPATH` environment variable:
@@ -103,7 +103,7 @@ export PYTHONPATH=".agents/skills:$PYTHONPATH"
 ```bash
 PYTHONPATH=.agents/skills uv run --with {{ dependencies | join(" --with ") }} python -c "
 import asyncio
-from {{ skill_name }}.app import {{ class_name }}
+from {{ module_name }}.app import {{ class_name }}
 
 async def main():
 {% if auth_type in ('bearer', 'header') %}
@@ -124,7 +124,7 @@ asyncio.run(main())
 pip install {{ dependencies | join(" ") }}
 PYTHONPATH=.agents/skills python -c "
 import asyncio
-from {{ skill_name }}.app import {{ class_name }}
+from {{ module_name }}.app import {{ class_name }}
 
 async def main():
 {% if auth_type in ('bearer', 'header') %}

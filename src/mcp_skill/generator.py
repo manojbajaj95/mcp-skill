@@ -116,6 +116,7 @@ def generate_app_py(
     auth_type: str = "none",
     auth_header: str | None = None,
     skill_name: str | None = None,
+    module_name: str | None = None,
 ) -> str:
     methods, method_refs = _prepare_methods(tools)
 
@@ -135,6 +136,7 @@ def generate_app_py(
         auth_type=auth_type,
         auth_header=auth_header,
         skill_name=skill_name,
+        module_name=module_name or skill_name,
         brief=brief,
         methods=methods,
         method_refs=method_refs,
@@ -159,6 +161,7 @@ def generate_skill_md(
     class_name: str = "App",
     auth_type: str = "none",
     auth_header: str | None = None,
+    module_name: str | None = None,
 ) -> str:
     if len(description) > 1024:
         description = description[:1021] + "..."
@@ -169,6 +172,7 @@ def generate_skill_md(
     template = _env.get_template("skill.md.j2")
     content = template.render(
         skill_name=skill_name,
+        module_name=module_name or skill_name,
         description=description,
         class_name=class_name,
         auth_type=auth_type,
