@@ -123,6 +123,7 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
         app_code = generate_app_py(
             class_name, url, tools,
             auth_type=auth_type, auth_header=auth_header,
+            skill_name=name,
         )
         skill_md = generate_skill_md(
             name, description, tools, class_name,

@@ -1,7 +1,10 @@
 """MCP server connection and tool discovery."""
-import asyncio
+from pathlib import Path
+
 from fastmcp import Client
+from fastmcp.client.auth import OAuth
 from fastmcp.client.transports import StreamableHttpTransport
+from key_value.aio.stores.disk import DiskStore
 
 
 async def connect_and_list_tools(
@@ -13,7 +16,8 @@ async def connect_and_list_tools(
     
     Args:
         url: MCP server URL (HTTP/HTTPS)
-        auth: Authentication - None for no auth, string for Bearer token
+        auth: Authentication - None for no auth, "oauth" for OAuth with
+              persistent disk-backed token storage, or a string for Bearer token
         headers: Custom headers dict (e.g. {"x-api-key": "..."}). When
                  provided, a StreamableHttpTransport is constructed directly
                  so that headers are sent on every request.
@@ -29,6 +33,12 @@ async def connect_and_list_tools(
         if headers:
             transport = StreamableHttpTransport(url=url, headers=headers)
             client = Client(transport)
+        elif auth and auth.lower() == "oauth":
+            token_storage = DiskStore(
+                directory=Path.home() / ".mcp-skill" / "oauth-tokens"
+            )
+            oauth = OAuth(token_storage=token_storage)
+            client = Client(url, auth=oauth)
         elif auth and auth.lower() not in ("none", ""):
             client = Client(url, auth=auth)
         else:

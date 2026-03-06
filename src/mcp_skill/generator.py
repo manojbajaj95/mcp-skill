@@ -115,6 +115,7 @@ def generate_app_py(
     tools: list,
     auth_type: str = "none",
     auth_header: str | None = None,
+    skill_name: str | None = None,
 ) -> str:
     methods, method_refs = _prepare_methods(tools)
 
@@ -133,6 +134,7 @@ def generate_app_py(
         server_url=server_url,
         auth_type=auth_type,
         auth_header=auth_header,
+        skill_name=skill_name,
         brief=brief,
         methods=methods,
         method_refs=method_refs,
@@ -145,6 +147,8 @@ def _compute_dependencies(auth_type: str) -> list[str]:
     deps = ["fastmcp>=2.0"]
     if auth_type in ("bearer", "header"):
         deps.append("httpx")
+    if auth_type != "none":
+        deps.append("py-key-value-aio[disk]")
     return deps
 
 
