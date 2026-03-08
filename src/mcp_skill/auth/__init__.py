@@ -6,10 +6,11 @@ from fastmcp.client.auth import OAuth
 
 from .api_key import ApiKeyAuth
 from .bearer import BearerAuth
+from .client_credentials import ClientCredentialsAuth
 
 __all__ = [
     "BearerAuth",
     "ApiKeyAuth",
     "OAuth",
-    "ClientCredentialsAuth",  # Forward reference - will be added in Task 2
+    "ClientCredentialsAuth",
 ]
