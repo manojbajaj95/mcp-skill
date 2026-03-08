@@ -1,85 +1,16 @@
 """Application for interacting with {{ base_name }} via MCP."""
 from typing import Any
 from fastmcp import Client
-{% if auth_type in ("bearer", "header") %}
-import httpx
-{% endif %}
-{% if auth_type == "oauth" %}
-from fastmcp.client.auth import OAuth
-{% endif %}
-{% if auth_type != "none" %}
-from pathlib import Path
-from key_value.aio.stores.disk import DiskStore
+{% if auth_type == "bearer" %}
+from mcp_skill.auth import BearerAuth
+{% elif auth_type == "header" %}
+from mcp_skill.auth import ApiKeyAuth
+{% elif auth_type == "oauth" %}
+from mcp_skill.auth import OAuth
 {% endif %}
 import json
 {% if auth_type == "none" %}
 import warnings
-{% endif %}
-
-{% if auth_type == "bearer" %}
-
-class _BearerAuth(httpx.Auth):
-    """Bearer token auth with persistent disk-backed storage.
-
-    On first use, pass an api_key to persist it. Subsequent instantiations
-    without an api_key will load the token from disk automatically.
-    """
-
-    def __init__(self, api_key: str | None, token_storage: DiskStore):
-        self._api_key = api_key
-        self._token_storage = token_storage
-        self._resolved_key: str | None = None
-
-    async def async_auth_flow(self, request: httpx.Request):
-        if not self._resolved_key:
-            if self._api_key:
-                await self._token_storage.put(key="api-key", value=self._api_key)
-                self._resolved_key = self._api_key
-            else:
-                stored = await self._token_storage.get(key="api-key")
-                if stored:
-                    self._resolved_key = stored
-                else:
-                    raise ValueError(
-                        "No API key provided and none found in storage at "
-                        "~/.mcp-skill/{{ skill_name }}/api-tokens/. "
-                        "Pass auth= on first use to persist it."
-                    )
-        request.headers["Authorization"] = f"Bearer {self._resolved_key}"
-        yield request
-
-{% elif auth_type == "header" %}
-
-class _ApiKeyAuth(httpx.Auth):
-    """Custom header auth with persistent disk-backed storage.
-
-    On first use, pass an api_key to persist it. Subsequent instantiations
-    without an api_key will load the token from disk automatically.
-    """
-
-    def __init__(self, api_key: str | None, token_storage: DiskStore):
-        self._api_key = api_key
-        self._token_storage = token_storage
-        self._resolved_key: str | None = None
-
-    async def async_auth_flow(self, request: httpx.Request):
-        if not self._resolved_key:
-            if self._api_key:
-                await self._token_storage.put(key="api-key", value=self._api_key)
-                self._resolved_key = self._api_key
-            else:
-                stored = await self._token_storage.get(key="api-key")
-                if stored:
-                    self._resolved_key = stored
-                else:
-                    raise ValueError(
-                        "No API key provided and none found in storage at "
-                        "~/.mcp-skill/{{ skill_name }}/api-tokens/. "
-                        "Pass auth= on first use to persist it."
-                    )
-        request.headers["{{ auth_header }}"] = self._resolved_key
-        yield request
-
 {% endif %}
 
 class {{ class_name }}:
@@ -91,20 +22,14 @@ class {{ class_name }}:
 {% if auth_type in ("bearer", "header") %}
     def __init__(self, url: str = "{{ server_url }}", auth=None) -> None:
         self.url = url
-        self._token_storage = DiskStore(
-            directory=Path.home() / ".mcp-skill" / "{{ skill_name }}" / "api-tokens"
-        )
 {% if auth_type == "bearer" %}
-        self._auth = _BearerAuth(auth, self._token_storage)
+        self._auth = BearerAuth(api_key=auth, skill_name="{{ skill_name }}")
 {% else %}
-        self._auth = _ApiKeyAuth(auth, self._token_storage)
+        self._auth = ApiKeyAuth(api_key=auth, skill_name="{{ skill_name }}", header_name="{{ auth_header }}")
 {% endif %}
 {% elif auth_type == "oauth" %}
     def __init__(self, url: str = "{{ server_url }}", auth=None) -> None:
         self.url = url
-        self._token_storage = DiskStore(
-            directory=Path.home() / ".mcp-skill" / "{{ skill_name }}" / "oauth-tokens"
-        )
         self._oauth_auth = auth
 {% else %}
     def __init__(self, url: str = "{{ server_url }}", auth=None) -> None:
@@ -122,7 +47,7 @@ class {{ class_name }}:
         return Client(self.url, auth=self._auth)
 {% elif auth_type == "oauth" %}
     def _get_client(self) -> Client:
-        oauth = self._oauth_auth or OAuth(token_storage=self._token_storage)
+        oauth = self._oauth_auth or OAuth()
         return Client(self.url, auth=oauth)
 {% else %}
     def _get_client(self) -> Client:

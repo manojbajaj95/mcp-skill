@@ -146,12 +146,7 @@ def generate_app_py(
 
 
 def _compute_dependencies(auth_type: str) -> list[str]:
-    deps = ["fastmcp>=2.0"]
-    if auth_type in ("bearer", "header"):
-        deps.append("httpx")
-    if auth_type != "none":
-        deps.append("py-key-value-aio[disk]")
-    return deps
+    return ["mcp-skill"]
 
 
 def generate_skill_md(

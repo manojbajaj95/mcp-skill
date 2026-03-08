@@ -66,20 +66,18 @@ app = {{ class_name }}(auth=my_oauth_provider)
 
 This skill requires the following Python packages:
 
-{% for dep in dependencies %}
-- `{{ dep }}`
-{% endfor %}
+- `mcp-skill`
 
 Install with uv:
 
 ```bash
-uv pip install {{ dependencies | join(" ") }}
+uv pip install mcp-skill
 ```
 
 Or with pip:
 
 ```bash
-pip install {{ dependencies | join(" ") }}
+pip install mcp-skill
 ```
 
 ## How to Run
@@ -101,7 +99,7 @@ export PYTHONPATH=".agents/skills:$PYTHONPATH"
 **Preferred: use `uv run`** (handles dependencies automatically):
 
 ```bash
-PYTHONPATH=.agents/skills uv run --with {{ dependencies | join(" --with ") }} python -c "
+PYTHONPATH=.agents/skills uv run --with mcp-skill python -c "
 import asyncio
 from {{ module_name }}.app import {{ class_name }}
 
@@ -121,7 +119,7 @@ asyncio.run(main())
 **Alternative: use `python` directly** (install dependencies first):
 
 ```bash
-pip install {{ dependencies | join(" ") }}
+pip install mcp-skill
 PYTHONPATH=.agents/skills python -c "
 import asyncio
 from {{ module_name }}.app import {{ class_name }}
