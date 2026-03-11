@@ -1,12 +1,10 @@
 """CLI entry point for mcp-skill."""
 
 import asyncio
-import os
 import sys
-
-import click
-
 from pathlib import Path
+
+import asyncclick as click
 
 from mcp_skill.introspector import connect_and_list_tools
 from mcp_skill.generator import generate_app_py, generate_skill_md
@@ -21,7 +19,7 @@ from mcp_skill.validator import validate_generated_code
 
 
 @click.group()
-def main():
+async def main():
     """Convert any MCP server into an Agent Skill."""
 
 
@@ -49,7 +47,9 @@ def main():
     default=None,
     help="App class base name (e.g. 'Fetch' → FetchApp)",
 )
-def create(url, auth, name, api_key, auth_header, force, non_interactive, app_name):
+async def create(
+    url, auth, name, api_key, auth_header, force, non_interactive, app_name
+):
     """Create an Agent Skill from an MCP server."""
     # Generation order:
     # 1. Ask/resolve URL
@@ -67,7 +67,7 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
                 sys.exit(1)
         else:
             if not url:
-                url = click.prompt("MCP Server URL")
+                url = await click.prompt("MCP Server URL")
 
         # Step 2: Derive and confirm skill name from URL
         url_derived_name = derive_skill_name_from_url(url)
@@ -75,7 +75,7 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
             if non_interactive:
                 name = url_derived_name
             else:
-                name = click.prompt("Skill name", default=url_derived_name)
+                name = await click.prompt("Skill name", default=url_derived_name)
         else:
             name = derive_skill_name(name)
 
@@ -85,14 +85,14 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
             if non_interactive:
                 app_name = default_app
             else:
-                app_name = click.prompt(
+                app_name = await click.prompt(
                     "App name (base name, 'App' suffix added automatically)",
                     default=default_app,
                 )
 
         # Step 4: Resolve auth type, using skill name for token storage
         if not non_interactive and auth == "none":
-            auth = click.prompt(
+            auth = await click.prompt(
                 "Authentication type",
                 type=click.Choice(["none", "api-key", "oauth"]),
                 default="none",
@@ -105,7 +105,7 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
                     err=True,
                 )
                 sys.exit(1)
-            api_key = click.prompt("API Key", hide_input=True)
+            api_key = await click.prompt("API Key", hide_input=True)
 
         auth_str = None
         headers: dict[str, str] | None = None
@@ -125,8 +125,8 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
         # Step 5: Connect and list tools
         click.echo(f"Connecting to {url}...")
         try:
-            server_name, tools = asyncio.run(
-                connect_and_list_tools(url, auth_str, headers=headers)
+            server_name, tools = await connect_and_list_tools(
+                url, auth_str, headers=headers
             )
         except (ConnectionError, RuntimeError) as e:
             click.echo(f"Error: {e}", err=True)
@@ -141,8 +141,8 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
             click.echo("Warning: Server has 0 tools. Generating minimal skill.")
 
         module_name = derive_module_name(name)
-        output_dir = os.path.join(".agents", "skills", module_name)
-        if os.path.exists(output_dir):
+        output_dir = Path(".agents") / "skills" / module_name
+        if output_dir.exists():
             if not force:
                 if non_interactive:
                     click.echo(
@@ -179,18 +179,15 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
             module_name=module_name,
         )
 
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        with open(os.path.join(output_dir, "__init__.py"), "w") as f:
-            f.write("")
+        await asyncio.gather(
+            asyncio.to_thread((output_dir / "__init__.py").write_text, ""),
+            asyncio.to_thread((output_dir / "app.py").write_text, app_code),
+            asyncio.to_thread((output_dir / "SKILL.md").write_text, skill_md),
+        )
 
-        with open(os.path.join(output_dir, "app.py"), "w") as f:
-            f.write(app_code)
-
-        with open(os.path.join(output_dir, "SKILL.md"), "w") as f:
-            f.write(skill_md)
-
-        app_py_path = Path(output_dir) / "app.py"
+        app_py_path = output_dir / "app.py"
         click.echo("Validating generated code...")
         report = validate_generated_code(app_py_path)
         click.echo(report.summary())

@@ -2,24 +2,27 @@
 
 import httpx
 
-from .storage import get_default_token_storage
+from .storage import get_token_storage
 
 
 class ClientCredentialsAuth(httpx.Auth):
-    """OAuth2 Client Credentials auth with disk-backed token caching."""
+    """OAuth2 Client Credentials auth with persistent token caching.
+
+    Tokens are stored under ``<token_url>/cc_token`` in the shared token store.
+    """
 
     def __init__(
         self,
         client_id: str,
         client_secret: str,
         token_url: str,
-        skill_name: str = "default",
         **kwargs,
     ) -> None:
         self._client_id = client_id
         self._client_secret = client_secret
         self._token_url = token_url
-        self._token_storage = get_default_token_storage(skill_name)
+        self._storage_key = f"{token_url}/cc_token"
+        self._token_storage = get_token_storage()
         self._access_token: str | None = None
 
     async def async_auth_flow(self, request: httpx.Request):
@@ -29,7 +32,7 @@ class ClientCredentialsAuth(httpx.Auth):
         yield request
 
     async def _fetch_token(self) -> str:
-        cached = await self._token_storage.get(key="cc-token")
+        cached = await self._token_storage.get(key=self._storage_key)
         if cached:
             return cached
         async with httpx.AsyncClient() as client:
@@ -40,5 +43,5 @@ class ClientCredentialsAuth(httpx.Auth):
             })
             resp.raise_for_status()
             token = resp.json()["access_token"]
-            await self._token_storage.put(key="cc-token", value=token)
+            await self._token_storage.put(key=self._storage_key, value=token)
             return token

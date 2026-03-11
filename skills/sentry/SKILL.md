@@ -1,18 +1,18 @@
 ---
 name: sentry
-description: "MCP skill for sentry. Provides 13 tools: whoami, find_organizations, find_teams, find_projects, find_releases, get_issue_details, get_issue_tag_values, get_trace_details, get_event_attachment, search_events, analyze_issue_with_seer, search_issues, search_issue_events"
+description: "MCP skill for sentry. Provides 21 tools: whoami, find_organizations, find_teams, find_projects, find_releases, get_issue_details, get_issue_tag_values, get_trace_details, get_event_attachment, update_issue, search_events, create_team, create_project, update_project, create_dsn, find_dsns, analyze_issue_with_seer, search_docs, get_doc, search_issues, search_issue_events"
 ---
 
 # sentry
 
-MCP skill for sentry. Provides 13 tools: whoami, find_organizations, find_teams, find_projects, find_releases, get_issue_details, get_issue_tag_values, get_trace_details, get_event_attachment, search_events, analyze_issue_with_seer, search_issues, search_issue_events
+MCP skill for sentry. Provides 21 tools: whoami, find_organizations, find_teams, find_projects, find_releases, get_issue_details, get_issue_tag_values, get_trace_details, get_event_attachment, update_issue, search_events, create_team, create_project, update_project, create_dsn, find_dsns, analyze_issue_with_seer, search_docs, get_doc, search_issues, search_issue_events
 
 ## Authentication
 
 This MCP server uses **OAuth** authentication.
 The OAuth flow is handled automatically by the MCP client. Tokens are persisted
-to `~/.mcp-skill/sentry/oauth-tokens/` so subsequent runs reuse the
-same credentials without re-authenticating.
+to `~/.mcp-skill/auth/` so subsequent runs reuse the same credentials without
+re-authenticating.
 
 ```python
 app = SentryApp()  # uses default OAuth flow
@@ -402,6 +402,66 @@ get_event_attachment(organizationSlug='my-organization', projectSlug='my-project
 result = await app.get_event_attachment(organizationSlug="example", projectSlug="example", eventId="example")
 ```
 
+### update_issue
+
+Update an issue's status or assignment in Sentry. This allows you to resolve, ignore, or reassign issues.
+
+Use this tool when you need to:
+- Resolve an issue that has been fixed
+- Assign an issue to a team member or team for investigation
+- Mark an issue as ignored to reduce noise
+- Reopen a resolved issue by setting status to 'unresolved'
+
+<examples>
+### Resolve an issue
+
+```
+update_issue(organizationSlug='my-organization', issueId='PROJECT-123', status='resolved')
+```
+
+### Assign an issue to a user (use whoami to get your user ID)
+
+```
+update_issue(organizationSlug='my-organization', issueId='PROJECT-123', assignedTo='user:123456')
+```
+
+### Assign an issue to a team (by ID or slug)
+
+```
+update_issue(organizationSlug='my-organization', issueId='PROJECT-123', assignedTo='team:789')
+update_issue(organizationSlug='my-organization', issueId='PROJECT-123', assignedTo='team:my-team-slug')
+```
+
+### Mark an issue as ignored
+
+```
+update_issue(organizationSlug='my-organization', issueId='PROJECT-123', status='ignored')
+```
+
+</examples>
+
+<hints>
+- If the user provides the `issueUrl`, you can ignore the other required parameters and extract them from the URL.
+- At least one of `status` or `assignedTo` must be provided to update the issue.
+- assignedTo format: Use 'user:ID' for users (e.g., 'user:123456') or 'team:ID_OR_SLUG' for teams (e.g., 'team:789' or 'team:my-team-slug')
+- To find your user ID, first use the whoami tool which returns your numeric user ID
+- Valid status values are: 'resolved', 'resolvedInNextRelease', 'unresolved', 'ignored'.
+</hints>
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| organizationSlug | `str` | No | The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool. |
+| regionUrl | `str | None` | No | The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool. |
+| issueId | `str` | No | The Issue ID. e.g. `PROJECT-1Z43` |
+| issueUrl | `str` | No | The URL of the issue. e.g. https://my-organization.sentry.io/issues/PROJECT-1Z43 |
+| status | `str` | No | The new status for the issue. Valid values are 'resolved', 'resolvedInNextRelease', 'unresolved', and 'ignored'. |
+| assignedTo | `str` | No | The assignee in format 'user:ID' or 'team:ID_OR_SLUG' where ID is numeric. Example: 'user:123456', 'team:789', or 'team:my-team-slug'. Use the whoami tool to find your user ID. |
+
+**Example:**
+```python
+result = await app.update_issue(organizationSlug="example", regionUrl="example", issueId="example")
+```
+
 ### search_events
 
 Search for events AND perform counts/aggregations - the ONLY tool for statistics and counts.
@@ -436,65 +496,5 @@ search_events(organizationSlug='my-org', naturalLanguageQuery='total tokens used
 search_events(organizationSlug='my-org', naturalLanguageQuery='error logs from the last hour')
 </examples>
 
-<hints>
-- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.
-- Parse org/project notation directly without calling find_organizations or find_projects.
-</hints>
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| organizationSlug | `str` | Yes | The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool. |
-| naturalLanguageQuery | `str` | Yes | Natural language description of what you want to search for |
-| projectSlug | `str | None` | No | The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool. |
-| regionUrl | `str | None` | No | The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool. |
-| limit | `float` | No | Maximum number of results to return |
-| includeExplanation | `bool` | No | Include explanation of how the query was translated |
-
-**Example:**
-```python
-result = await app.search_events(organizationSlug="example", naturalLanguageQuery="example", projectSlug="example")
-```
-
-### analyze_issue_with_seer
-
-Use Seer to analyze production errors and get detailed root cause analysis with specific code fixes.
-
-Use this tool when:
-- The user explicitly asks for root cause analysis, Seer analysis, or help fixing/debugging an issue
-- You are unable to accurately determine the root cause from the issue details alone
-
-Do NOT call this tool as an automatic follow-up to get_issue_details.
-
-What this tool provides:
-- Root cause analysis with code-level explanations
-- Specific file locations and line numbers where errors occur
-- Concrete code fixes you can apply
-- Step-by-step implementation guidance
-
-This tool automatically:
-1. Checks if analysis already exists (instant results)
-2. Starts new AI analysis if needed (~2-5 minutes)
-3. Returns complete fix recommendations
-
-<examples>
-### User: "Run Seer on this issue"
-
-```
-analyze_issue_with_seer(issueUrl='https://my-org.sentry.io/issues/PROJECT-1Z43')
-```
-
-### User: "Analyze this issue and suggest a fix"
-
-```
-analyze_issue_with_seer(organizationSlug='my-organization', issueId='ERROR-456')
-```
-</examples>
-
-<hints>
-- Only use when the user explicitly requests analysis or you cannot determine the root cause from issue details alone
-- If the user provides an issueUrl, extract it and use that parameter alone
-- The analysis includes actual code snippets and fixes, not just error descriptions
-- Results are cached - subsequent calls return instantly
-</hints>
 
 *...additional tools omitted for brevity*

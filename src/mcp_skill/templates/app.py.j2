@@ -23,9 +23,9 @@ class {{ class_name }}:
     def __init__(self, url: str = "{{ server_url }}", auth=None) -> None:
         self.url = url
 {% if auth_type == "bearer" %}
-        self._auth = BearerAuth(api_key=auth, skill_name="{{ skill_name }}")
+        self._auth = BearerAuth(api_key=auth, server_url=url)
 {% else %}
-        self._auth = ApiKeyAuth(api_key=auth, skill_name="{{ skill_name }}", header_name="{{ auth_header }}")
+        self._auth = ApiKeyAuth(api_key=auth, server_url=url, header_name="{{ auth_header }}")
 {% endif %}
 {% elif auth_type == "oauth" %}
     def __init__(self, url: str = "{{ server_url }}", auth=None) -> None:

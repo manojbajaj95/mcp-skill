@@ -1,18 +1,18 @@
 ---
 name: notion
-description: "MCP skill for notion. Provides 12 tools: notion-search, notion-fetch, notion-create-pages, notion-update-page, notion-move-pages, notion-duplicate-page, notion-create-database, notion-update-data-source, notion-create-comment, notion-get-comments, notion-get-teams, notion-get-users"
+description: "MCP skill for notion. Provides 14 tools: notion-search, notion-fetch, notion-create-pages, notion-update-page, notion-move-pages, notion-duplicate-page, notion-create-database, notion-update-data-source, notion-create-comment, notion-get-comments, notion-get-teams, notion-get-users, notion-create-view, notion-update-view"
 ---
 
 # notion
 
-MCP skill for notion. Provides 12 tools: notion-search, notion-fetch, notion-create-pages, notion-update-page, notion-move-pages, notion-duplicate-page, notion-create-database, notion-update-data-source, notion-create-comment, notion-get-comments, notion-get-teams, notion-get-users
+MCP skill for notion. Provides 14 tools: notion-search, notion-fetch, notion-create-pages, notion-update-page, notion-move-pages, notion-duplicate-page, notion-create-database, notion-update-data-source, notion-create-comment, notion-get-comments, notion-get-teams, notion-get-users, notion-create-view, notion-update-view
 
 ## Authentication
 
 This MCP server uses **OAuth** authentication.
 The OAuth flow is handled automatically by the MCP client. Tokens are persisted
-to `~/.mcp-skill/notion/oauth-tokens/` so subsequent runs reuse the
-same credentials without re-authenticating.
+to `~/.mcp-skill/auth/` so subsequent runs reuse the same credentials without
+re-authenticating.
 
 ```python
 app = NotionApp()  # uses default OAuth flow

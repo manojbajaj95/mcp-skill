@@ -1,9 +1,9 @@
 ---
-name: paralel-search
+name: parallel-search
 description: "MCP skill for search-mcp. Provides 2 tools: web_search_preview, web_fetch"
 ---
 
-# paralel-search
+# parallel-search
 
 MCP skill for search-mcp. Provides 2 tools: web_search_preview, web_fetch
 
@@ -11,8 +11,8 @@ MCP skill for search-mcp. Provides 2 tools: web_search_preview, web_fetch
 
 This MCP server uses **OAuth** authentication.
 The OAuth flow is handled automatically by the MCP client. Tokens are persisted
-to `~/.mcp-skill/paralel-search/oauth-tokens/` so subsequent runs reuse the
-same credentials without re-authenticating.
+to `~/.mcp-skill/auth/` so subsequent runs reuse the same credentials without
+re-authenticating.
 
 ```python
 app = ParallelsearchApp()  # uses default OAuth flow
@@ -49,7 +49,7 @@ pip install mcp-skill
 ```python
 import sys
 sys.path.insert(0, ".agents/skills")
-from paralel_search.app import ParallelsearchApp
+from parallel_search.app import ParallelsearchApp
 ```
 
 Or set the `PYTHONPATH` environment variable:
@@ -63,7 +63,7 @@ export PYTHONPATH=".agents/skills:$PYTHONPATH"
 ```bash
 PYTHONPATH=.agents/skills uv run --with mcp-skill python -c "
 import asyncio
-from paralel_search.app import ParallelsearchApp
+from parallel_search.app import ParallelsearchApp
 
 async def main():
     app = ParallelsearchApp()
@@ -80,7 +80,7 @@ asyncio.run(main())
 pip install mcp-skill
 PYTHONPATH=.agents/skills python -c "
 import asyncio
-from paralel_search.app import ParallelsearchApp
+from parallel_search.app import ParallelsearchApp
 
 async def main():
     app = ParallelsearchApp()

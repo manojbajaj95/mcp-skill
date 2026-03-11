@@ -7,7 +7,7 @@ import json
 class SentryApp:
     """
     Application for interacting with Sentry via MCP.
-    Provides tools to interact with tools: whoami, find_organizations, find_teams, find_projects, find_releases and 8 more.
+    Provides tools to interact with tools: whoami, find_organizations, find_teams, find_projects, find_releases and 16 more.
     """
 
     def __init__(self, url: str = "https://mcp.sentry.dev/mcp", auth=None) -> None:
@@ -494,6 +494,91 @@ get_event_attachment(organizationSlug='my-organization', projectSlug='my-project
             except (json.JSONDecodeError, TypeError):
                 return {"result": text}
 
+    async def update_issue(self, assignedTo: str = None, issueId: str = None, issueUrl: str = None, organizationSlug: str = None, regionUrl: str | None = None, status: str = None) -> dict[str, Any]:
+        """
+        Update an issue's status or assignment in Sentry. This allows you to resolve, ignore, or reassign issues.
+
+Use this tool when you need to:
+- Resolve an issue that has been fixed
+- Assign an issue to a team member or team for investigation
+- Mark an issue as ignored to reduce noise
+- Reopen a resolved issue by setting status to 'unresolved'
+
+<examples>
+### Resolve an issue
+
+```
+update_issue(organizationSlug='my-organization', issueId='PROJECT-123', status='resolved')
+```
+
+### Assign an issue to a user (use whoami to get your user ID)
+
+```
+update_issue(organizationSlug='my-organization', issueId='PROJECT-123', assignedTo='user:123456')
+```
+
+### Assign an issue to a team (by ID or slug)
+
+```
+update_issue(organizationSlug='my-organization', issueId='PROJECT-123', assignedTo='team:789')
+update_issue(organizationSlug='my-organization', issueId='PROJECT-123', assignedTo='team:my-team-slug')
+```
+
+### Mark an issue as ignored
+
+```
+update_issue(organizationSlug='my-organization', issueId='PROJECT-123', status='ignored')
+```
+
+</examples>
+
+<hints>
+- If the user provides the `issueUrl`, you can ignore the other required parameters and extract them from the URL.
+- At least one of `status` or `assignedTo` must be provided to update the issue.
+- assignedTo format: Use 'user:ID' for users (e.g., 'user:123456') or 'team:ID_OR_SLUG' for teams (e.g., 'team:789' or 'team:my-team-slug')
+- To find your user ID, first use the whoami tool which returns your numeric user ID
+- Valid status values are: 'resolved', 'resolvedInNextRelease', 'unresolved', 'ignored'.
+</hints>
+
+        Args:
+            assignedTo: The assignee in format 'user:ID' or 'team:ID_OR_SLUG' where ID is numeric. Example: 'user:123456', 'team:789', or 'team:my-team-slug'. Use the whoami tool to find your user ID.
+            issueId: The Issue ID. e.g. `PROJECT-1Z43`
+            issueUrl: The URL of the issue. e.g. https://my-organization.sentry.io/issues/PROJECT-1Z43
+            organizationSlug: The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool.
+            regionUrl: The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.
+            status: The new status for the issue. Valid values are 'resolved', 'resolvedInNextRelease', 'unresolved', and 'ignored'.
+
+        Returns:
+            Tool execution result
+
+        Tags:
+            update, issue
+        """
+        async with self._get_client() as client:
+            call_args = {}
+            if assignedTo is not None:
+                call_args["assignedTo"] = assignedTo
+            if issueId is not None:
+                call_args["issueId"] = issueId
+            if issueUrl is not None:
+                call_args["issueUrl"] = issueUrl
+            if organizationSlug is not None:
+                call_args["organizationSlug"] = organizationSlug
+            if regionUrl is not None:
+                call_args["regionUrl"] = regionUrl
+            if status is not None:
+                call_args["status"] = status
+            result = await client.call_tool("update_issue", call_args)
+            texts = []
+            for block in result.content:
+                if hasattr(block, "text"):
+                    texts.append(block.text)
+            text = "\n".join(texts)
+            try:
+                return json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                return {"result": text}
+
     async def search_events(self, naturalLanguageQuery: str, organizationSlug: str, includeExplanation: bool = None, limit: float = None, projectSlug: str | None = None, regionUrl: str | None = None) -> dict[str, Any]:
         """
         Search for events AND perform counts/aggregations - the ONLY tool for statistics and counts.
@@ -560,6 +645,289 @@ search_events(organizationSlug='my-org', naturalLanguageQuery='error logs from t
             if regionUrl is not None:
                 call_args["regionUrl"] = regionUrl
             result = await client.call_tool("search_events", call_args)
+            texts = []
+            for block in result.content:
+                if hasattr(block, "text"):
+                    texts.append(block.text)
+            text = "\n".join(texts)
+            try:
+                return json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                return {"result": text}
+
+    async def create_team(self, name: str, organizationSlug: str, regionUrl: str | None = None) -> dict[str, Any]:
+        """
+        Create a new team in Sentry.
+
+USE THIS TOOL WHEN USERS WANT TO:
+- 'Create a new team'
+- 'Set up a team called [X]'
+- 'I need a team for my project'
+
+Be careful when using this tool!
+
+<examples>
+### Create a new team
+```
+create_team(organizationSlug='my-organization', name='the-goats')
+```
+</examples>
+
+<hints>
+- If any parameter is ambiguous, you should clarify with the user what they meant.
+</hints>
+
+        Args:
+            name: The name of the team to create.
+            organizationSlug: The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool.
+            regionUrl: The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.
+
+        Returns:
+            Tool execution result
+
+        Tags:
+            create, team
+        """
+        async with self._get_client() as client:
+            call_args = {}
+            call_args["name"] = name
+            call_args["organizationSlug"] = organizationSlug
+            if regionUrl is not None:
+                call_args["regionUrl"] = regionUrl
+            result = await client.call_tool("create_team", call_args)
+            texts = []
+            for block in result.content:
+                if hasattr(block, "text"):
+                    texts.append(block.text)
+            text = "\n".join(texts)
+            try:
+                return json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                return {"result": text}
+
+    async def create_project(self, name: str, organizationSlug: str, teamSlug: str, platform: str | None = None, regionUrl: str | None = None) -> dict[str, Any]:
+        """
+        Create a new project in Sentry (includes DSN automatically).
+
+USE THIS TOOL WHEN USERS WANT TO:
+- 'Create a new project'
+- 'Set up a project for [app/service] with team [X]'
+- 'I need a new Sentry project'
+- Create project AND need DSN in one step
+
+DO NOT USE create_dsn after this - DSN is included in output.
+
+Be careful when using this tool!
+
+<examples>
+### Create new project with team
+```
+create_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript')
+```
+</examples>
+
+<hints>
+- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<teamSlug>.
+- If any parameter is ambiguous, you should clarify with the user what they meant.
+</hints>
+
+        Args:
+            name: The name of the project to create. Typically this is commonly the name of the repository or service. It is only used as a visual label in Sentry.
+            organizationSlug: The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool.
+            teamSlug: The team's slug. You can find a list of existing teams in an organization using the `find_teams()` tool.
+            platform: The platform for the project. e.g., python, javascript, react, etc.
+            regionUrl: The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.
+
+        Returns:
+            Tool execution result
+
+        Tags:
+            create, project
+        """
+        async with self._get_client() as client:
+            call_args = {}
+            call_args["name"] = name
+            call_args["organizationSlug"] = organizationSlug
+            call_args["teamSlug"] = teamSlug
+            if platform is not None:
+                call_args["platform"] = platform
+            if regionUrl is not None:
+                call_args["regionUrl"] = regionUrl
+            result = await client.call_tool("create_project", call_args)
+            texts = []
+            for block in result.content:
+                if hasattr(block, "text"):
+                    texts.append(block.text)
+            text = "\n".join(texts)
+            try:
+                return json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                return {"result": text}
+
+    async def update_project(self, organizationSlug: str, projectSlug: str, name: str | None = None, platform: str | None = None, regionUrl: str | None = None, slug: str | None = None, teamSlug: str | None = None) -> dict[str, Any]:
+        """
+        Update project settings in Sentry, such as name, slug, platform, and team assignment.
+
+Be careful when using this tool!
+
+Use this tool when you need to:
+- Update a project's name or slug to fix onboarding mistakes
+- Change the platform assigned to a project
+- Update team assignment for a project
+
+<examples>
+### Update a project's name and slug
+
+```
+update_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', slug='new-project-slug')
+```
+
+### Assign a project to a different team
+
+```
+update_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='backend-team')
+```
+
+### Update platform
+
+```
+update_project(organizationSlug='my-organization', projectSlug='my-project', platform='python')
+```
+
+</examples>
+
+<hints>
+- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.
+- Team assignment is handled separately from other project settings
+- If any parameter is ambiguous, you should clarify with the user what they meant.
+- When updating the slug, the project will be accessible at the new slug after the update
+</hints>
+
+        Args:
+            organizationSlug: The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool.
+            projectSlug: The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool.
+            name: The new name for the project
+            platform: The platform for the project. e.g., python, javascript, react, etc.
+            regionUrl: The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.
+            slug: The new slug for the project (must be unique)
+            teamSlug: The team to assign this project to. Note: this will replace the current team assignment.
+
+        Returns:
+            Tool execution result
+
+        Tags:
+            update, project
+        """
+        async with self._get_client() as client:
+            call_args = {}
+            call_args["organizationSlug"] = organizationSlug
+            call_args["projectSlug"] = projectSlug
+            if name is not None:
+                call_args["name"] = name
+            if platform is not None:
+                call_args["platform"] = platform
+            if regionUrl is not None:
+                call_args["regionUrl"] = regionUrl
+            if slug is not None:
+                call_args["slug"] = slug
+            if teamSlug is not None:
+                call_args["teamSlug"] = teamSlug
+            result = await client.call_tool("update_project", call_args)
+            texts = []
+            for block in result.content:
+                if hasattr(block, "text"):
+                    texts.append(block.text)
+            text = "\n".join(texts)
+            try:
+                return json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                return {"result": text}
+
+    async def create_dsn(self, name: str, organizationSlug: str, projectSlug: str, regionUrl: str | None = None) -> dict[str, Any]:
+        """
+        Create an additional DSN for an EXISTING project.
+
+USE THIS TOOL WHEN:
+- Project already exists and needs additional DSN
+- 'Create another DSN for project X'
+- 'I need a production DSN for existing project'
+
+DO NOT USE for new projects (use create_project instead)
+
+Be careful when using this tool!
+
+<examples>
+### Create additional DSN for existing project
+```
+create_dsn(organizationSlug='my-organization', projectSlug='my-project', name='Production')
+```
+</examples>
+
+<hints>
+- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.
+- If any parameter is ambiguous, you should clarify with the user what they meant.
+</hints>
+
+        Args:
+            name: The name of the DSN to create, for example 'Production'.
+            organizationSlug: The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool.
+            projectSlug: The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool.
+            regionUrl: The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.
+
+        Returns:
+            Tool execution result
+
+        Tags:
+            create, dsn
+        """
+        async with self._get_client() as client:
+            call_args = {}
+            call_args["name"] = name
+            call_args["organizationSlug"] = organizationSlug
+            call_args["projectSlug"] = projectSlug
+            if regionUrl is not None:
+                call_args["regionUrl"] = regionUrl
+            result = await client.call_tool("create_dsn", call_args)
+            texts = []
+            for block in result.content:
+                if hasattr(block, "text"):
+                    texts.append(block.text)
+            text = "\n".join(texts)
+            try:
+                return json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                return {"result": text}
+
+    async def find_dsns(self, organizationSlug: str, projectSlug: str, regionUrl: str | None = None) -> dict[str, Any]:
+        """
+        List all Sentry DSNs for a specific project.
+
+Use this tool when you need to:
+- Retrieve a SENTRY_DSN for a specific project
+
+<hints>
+- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.
+- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you might want to call `find_organizations()` first.
+</hints>
+
+        Args:
+            organizationSlug: The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool.
+            projectSlug: The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool.
+            regionUrl: The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.
+
+        Returns:
+            Tool execution result
+
+        Tags:
+            find, dsns
+        """
+        async with self._get_client() as client:
+            call_args = {}
+            call_args["organizationSlug"] = organizationSlug
+            call_args["projectSlug"] = projectSlug
+            if regionUrl is not None:
+                call_args["regionUrl"] = regionUrl
+            result = await client.call_tool("find_dsns", call_args)
             texts = []
             for block in result.content:
                 if hasattr(block, "text"):
@@ -638,6 +1006,105 @@ analyze_issue_with_seer(organizationSlug='my-organization', issueId='ERROR-456')
             if regionUrl is not None:
                 call_args["regionUrl"] = regionUrl
             result = await client.call_tool("analyze_issue_with_seer", call_args)
+            texts = []
+            for block in result.content:
+                if hasattr(block, "text"):
+                    texts.append(block.text)
+            text = "\n".join(texts)
+            try:
+                return json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                return {"result": text}
+
+    async def search_docs(self, query: str, guide: str | None = None, maxResults: int = None) -> dict[str, Any]:
+        """
+        Search Sentry documentation for SDK setup, instrumentation, and configuration guidance.
+
+Use this tool when you need to:
+- Set up Sentry SDK or framework integrations (Django, Flask, Express, Next.js, etc.)
+- Configure features like performance monitoring, error sampling, or release tracking
+- Implement custom instrumentation (spans, transactions, breadcrumbs)
+- Configure data scrubbing, filtering, or sampling rules
+
+Returns snippets only. Use `get_doc(path='...')` to fetch full documentation content.
+
+<examples>
+```
+search_docs(query='Django setup configuration SENTRY_DSN', guide='python/django')
+search_docs(query='source maps webpack upload', guide='javascript/nextjs')
+```
+</examples>
+
+<hints>
+- Use guide parameter to filter to specific technologies (e.g., 'javascript/nextjs')
+- Include specific feature names like 'beforeSend', 'tracesSampleRate', 'SENTRY_DSN'
+</hints>
+
+        Args:
+            query: The search query in natural language. Be specific about what you're looking for.
+            guide: Optional guide filter to limit search results to specific documentation sections. Use either a platform (e.g., 'javascript', 'python') or platform/guide combination (e.g., 'javascript/nextjs', 'python/django').
+            maxResults: Maximum number of results to return (1-10)
+
+        Returns:
+            Tool execution result
+
+        Tags:
+            search, docs
+        """
+        async with self._get_client() as client:
+            call_args = {}
+            call_args["query"] = query
+            if guide is not None:
+                call_args["guide"] = guide
+            if maxResults is not None:
+                call_args["maxResults"] = maxResults
+            result = await client.call_tool("search_docs", call_args)
+            texts = []
+            for block in result.content:
+                if hasattr(block, "text"):
+                    texts.append(block.text)
+            text = "\n".join(texts)
+            try:
+                return json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                return {"result": text}
+
+    async def get_doc(self, path: str) -> dict[str, Any]:
+        """
+        Fetch the full markdown content of a Sentry documentation page.
+
+Use this tool when you need to:
+- Read the complete documentation for a specific topic
+- Get detailed implementation examples or code snippets
+- Access the full context of a documentation page
+- Extract specific sections from documentation
+
+<examples>
+### Get the Next.js integration guide
+
+```
+get_doc(path='/platforms/javascript/guides/nextjs.md')
+```
+</examples>
+
+<hints>
+- Use the path from search_docs results for accurate fetching
+- Paths should end with .md extension
+</hints>
+
+        Args:
+            path: The documentation path (e.g., '/platforms/javascript/guides/nextjs.md'). Get this from search_docs results.
+
+        Returns:
+            Tool execution result
+
+        Tags:
+            doc
+        """
+        async with self._get_client() as client:
+            call_args = {}
+            call_args["path"] = path
+            result = await client.call_tool("get_doc", call_args)
             texts = []
             for block in result.content:
                 if hasattr(block, "text"):
@@ -782,4 +1249,4 @@ search_issue_events(issueUrl='https://sentry.io/.../issues/123/', naturalLanguag
                 return {"result": text}
 
     def list_tools(self):
-        return [self.whoami, self.find_organizations, self.find_teams, self.find_projects, self.find_releases, self.get_issue_details, self.get_issue_tag_values, self.get_trace_details, self.get_event_attachment, self.search_events, self.analyze_issue_with_seer, self.search_issues, self.search_issue_events]
+        return [self.whoami, self.find_organizations, self.find_teams, self.find_projects, self.find_releases, self.get_issue_details, self.get_issue_tag_values, self.get_trace_details, self.get_event_attachment, self.update_issue, self.search_events, self.create_team, self.create_project, self.update_project, self.create_dsn, self.find_dsns, self.analyze_issue_with_seer, self.search_docs, self.get_doc, self.search_issues, self.search_issue_events]

@@ -11,8 +11,8 @@ MCP skill for clickup. Provides 32 tools: clickup_search, clickup_get_workspace_
 
 This MCP server uses **OAuth** authentication.
 The OAuth flow is handled automatically by the MCP client. Tokens are persisted
-to `~/.mcp-skill/clickup/oauth-tokens/` so subsequent runs reuse the
-same credentials without re-authenticating.
+to `~/.mcp-skill/auth/` so subsequent runs reuse the same credentials without
+re-authenticating.
 
 ```python
 app = ClickupApp()  # uses default OAuth flow

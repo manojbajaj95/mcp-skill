@@ -11,8 +11,8 @@ MCP skill for airtable. Provides 8 tools: ping, list_bases, search_bases, list_t
 
 This MCP server uses **OAuth** authentication.
 The OAuth flow is handled automatically by the MCP client. Tokens are persisted
-to `~/.mcp-skill/airtable/oauth-tokens/` so subsequent runs reuse the
-same credentials without re-authenticating.
+to `~/.mcp-skill/auth/` so subsequent runs reuse the same credentials without
+re-authenticating.
 
 ```python
 app = AirtableApp()  # uses default OAuth flow
@@ -183,9 +183,9 @@ result = await app.get_table_schema(baseId="example", tables="value")
 Lists records queried from an Airtable table.
 Do not assume baseId and tableId. Obtain these from search_bases → list_tables_for_base.
 Do not attempt to pass filterByFormula. Look carefully at the filters parameter.
-Pre-requisite: If filtering on select/multiSelect fields, you must call get_table_schema first to get the choice IDs.
+Pre-requisite: If filtering on singleSelect/multipleSelects fields, you must call get_table_schema first to get the choice IDs.
 Aim to provide at least 6 relevant fields via the 'fieldIds' parameter.
-Note: Select and multiSelect field values are returned as objects (e.g., {"id": "sel...", "name": "Option", "color": "blue"}) or arrays of such objects. When writing these values back via create_records_for_table or update_records_for_table, use the plain string name (e.g., "Option") instead of the object.
+Note: singleSelect and multipleSelects field values are returned as objects (e.g., {"id": "sel...", "name": "Option", "color": "blue"}) or arrays of such objects. When writing these values back via create_records_for_table or update_records_for_table, use the plain string name (e.g., "Option") instead of the object.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -241,8 +241,8 @@ result = await app.list_records_for_table(baseId="example", tableId="example", f
 
 Creates new records in an Airtable table.
 To get baseId and tableId, use the search_bases and list_tables_for_base tools first.
-For select/multiSelect fields, provide the option name as a plain string (e.g., "In progress") or array of strings, not the object format returned by list_records_for_table.
-Example: create a record with text, number, select, and multiSelect fields:
+For singleSelect/multipleSelects fields, provide the option name as a plain string (e.g., "In progress") or array of strings, not the object format returned by list_records_for_table.
+Example: create a record with singleLineText, number, singleSelect, and multipleSelects fields:
 {"baseId": "appZfrNIUEip5MazD", "tableId": "tblGlReoTNWfYnXIG", "records": [{"fields": {"fldGlRtkBNWfYnPOV": "Launch meeting", "fldulcCPDVz87Bmnw": 42, "fld8WsrpLHHevsnW8": "In progress", "fldgD18XtsueoiguT": ["Urgent", "Q1"]}}]}
 
 | Parameter | Type | Required | Description |
@@ -272,7 +272,7 @@ result = await app.create_records_for_table(baseId="example", tableId="example",
 Updates records in an Airtable table.
 The fields you specify will be updated, and all other fields will be left unchanged.
 To get baseId and tableId, consider using the search_bases and list_tables_for_base tools first.
-For select/multiSelect fields, provide the option name as a plain string (e.g., "In progress") or array of strings, not the object format returned by list_records_for_table.
+For singleSelect/multipleSelects fields, provide the option name as a plain string (e.g., "In progress") or array of strings, not the object format returned by list_records_for_table.
 Example: update a record's fields:
 {"baseId": "appZfrNIUEip5MazD", "tableId": "tblGlReoTNWfYnXIG", "records": [{"id": "recZOTa3BDHxlJNzf", "fields": {"fldGlRtkBNWfYnPOV": "Updated name", "fld8WsrpLHHevsnW8": "Done"}}]}
 

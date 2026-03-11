@@ -19,8 +19,7 @@ app = {{ class_name }}()
 Passing an `auth` argument is accepted but has no effect and will emit a warning.
 {% elif auth_type == "bearer" %}
 This MCP server uses **Bearer token** authentication. The API key is persisted
-to `~/.mcp-skill/{{ skill_name }}/api-tokens/` after first use, so subsequent
-runs can omit it.
+to `~/.mcp-skill/auth/` after first use, so subsequent runs can omit it.
 
 ```python
 # First use — provide and persist the key
@@ -33,8 +32,8 @@ app = {{ class_name }}()
 The key is sent as `Authorization: Bearer <auth>` on every request.
 {% elif auth_type == "header" %}
 This MCP server uses a custom **`{{ auth_header }}`** header for authentication.
-The API key is persisted to `~/.mcp-skill/{{ skill_name }}/api-tokens/` after
-first use, so subsequent runs can omit it.
+The API key is persisted to `~/.mcp-skill/auth/` after first use, so subsequent
+runs can omit it.
 
 ```python
 # First use — provide and persist the key
@@ -48,8 +47,8 @@ The key is sent as `{{ auth_header }}: <auth>` on every request.
 {% elif auth_type == "oauth" %}
 This MCP server uses **OAuth** authentication.
 The OAuth flow is handled automatically by the MCP client. Tokens are persisted
-to `~/.mcp-skill/{{ skill_name }}/oauth-tokens/` so subsequent runs reuse the
-same credentials without re-authenticating.
+to `~/.mcp-skill/auth/` so subsequent runs reuse the same credentials without
+re-authenticating.
 
 ```python
 app = {{ class_name }}()  # uses default OAuth flow

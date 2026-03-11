@@ -11,8 +11,8 @@ MCP skill for canva. Provides 22 tools: upload-asset-from-url, resolve-shortlink
 
 This MCP server uses **OAuth** authentication.
 The OAuth flow is handled automatically by the MCP client. Tokens are persisted
-to `~/.mcp-skill/canva/oauth-tokens/` so subsequent runs reuse the
-same credentials without re-authenticating.
+to `~/.mcp-skill/auth/` so subsequent runs reuse the same credentials without
+re-authenticating.
 
 ```python
 app = CanvaApp()  # uses default OAuth flow

@@ -7,7 +7,7 @@ import json
 class NotionApp:
     """
     Application for interacting with Notion via MCP.
-    Provides tools to interact with tools: notion-search, notion-fetch, notion-create-pages, notion-update-page, notion-move-pages and 7 more.
+    Provides tools to interact with tools: notion-search, notion-fetch, notion-create-pages, notion-update-page, notion-move-pages and 9 more.
     """
 
     def __init__(self, url: str = "https://mcp.notion.com/mcp", auth=None) -> None:
@@ -575,7 +575,7 @@ Same type syntax as create_database. Key types:
 Notes: Cannot delete/create title properties. Max one unique_id property. Cannot update synced databases. Use "fetch" first to see current schema and get the data source ID from <data-source url="collection://..."> tags.
 
         Args:
-            data_source_id: The ID of the data source to update. Can be a data source ID (collection ID, from fetch response's <data-source> tag) or a database ID (only if the database has a single data source). UUID format with or without dashes.
+            data_source_id: The data source to update. Accepts a collection:// URI from <data-source> tags, a bare UUID, or a database ID (only if the database has a single data source).
             description: The new description of the data source.
             in_trash: No description
             is_inline: No description
@@ -790,5 +790,104 @@ Supports cursor-based pagination to iterate through all users in the workspace.
             except (json.JSONDecodeError, TypeError):
                 return {"result": text}
 
+    async def notion_create_view(self, data_source_id: str, database_id: str, name: str, type: str, configure: str = None) -> dict[str, Any]:
+        """
+        Create a new view on a Notion database.
+Use "fetch" first to get the database_id and data_source_id (from <data-source> tags in the response).
+Supported types: table, board, list, calendar, timeline, gallery, dashboard.
+The optional "configure" param accepts a DSL for filters, sorts, grouping,
+and display options. See the notion://docs/view-dsl-spec resource for full
+syntax. Key directives:
+- FILTER "Property" = "value" — filter rows
+- SORT BY "Property" ASC — sort rows
+- GROUP BY "Property" — group by property (required for board views)
+- CALENDAR BY "Property" — date property (required for calendar views)
+- TIMELINE BY "Start" TO "End" — date range (required for timeline views)
+- SHOW "Prop1", "Prop2" — set visible properties
+- COVER "Property" — cover image property
+
+<example description="Table view">{"database_id": "abc123", "data_source_id": "def456", "name": "All Tasks", "type": "table"}</example>
+<example description="Board grouped by Status">{"database_id": "abc123", "data_source_id": "def456", "name": "Task Board", "type": "board", "configure": "GROUP BY "Status""}</example>
+<example description="Filtered + sorted table">{"database_id": "abc123", "data_source_id": "def456", "name": "Active", "type": "table", "configure": "FILTER "Status" = "In Progress"; SORT BY "Due Date" ASC"}</example>
+<example description="Calendar view">{"database_id": "abc123", "data_source_id": "def456", "name": "Calendar", "type": "calendar", "configure": "CALENDAR BY "Due Date""}</example>
+<example description="Dashboard">{"database_id": "abc123", "data_source_id": "def456", "name": "Overview", "type": "dashboard"}</example>
+
+        Args:
+            data_source_id: The data source (collection) ID. Accepts a collection:// URI from <data-source> tags or a bare UUID.
+            database_id: The database to create a view in. Accepts a Notion URL or a bare UUID.
+            name: The name of the view.
+            type: No description
+            configure: View configuration DSL string. Supports FILTER, SORT BY, GROUP BY, CALENDAR BY, TIMELINE BY, SHOW, HIDE, COVER, WRAP CELLS, and FREEZE COLUMNS directives. See notion://docs/view-dsl-spec for full syntax.
+
+        Returns:
+            Tool execution result
+
+        Tags:
+            notion, create, view
+        """
+        async with self._get_client() as client:
+            call_args = {}
+            call_args["data_source_id"] = data_source_id
+            call_args["database_id"] = database_id
+            call_args["name"] = name
+            call_args["type"] = type
+            if configure is not None:
+                call_args["configure"] = configure
+            result = await client.call_tool("notion-create-view", call_args)
+            texts = []
+            for block in result.content:
+                if hasattr(block, "text"):
+                    texts.append(block.text)
+            text = "\n".join(texts)
+            try:
+                return json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                return {"result": text}
+
+    async def notion_update_view(self, view_id: str, configure: str = None, name: str = None) -> dict[str, Any]:
+        """
+        Update a view's name, filters, sorts, or display configuration.
+Use "fetch" to get view IDs from database responses. Only include fields
+you want to change. The "configure" param uses the same DSL as create_view.
+Use CLEAR to remove settings:
+- CLEAR FILTER — remove all filters
+- CLEAR SORT — remove all sorts
+- CLEAR GROUP BY — remove grouping
+
+See notion://docs/view-dsl-spec resource for full syntax.
+<example description="Rename">{"view_id": "abc123", "name": "Sprint Board"}</example>
+<example description="Update filter">{"view_id": "abc123", "configure": "FILTER "Status" = "Done""}</example>
+<example description="Clear filter, add sort">{"view_id": "abc123", "configure": "CLEAR FILTER; SORT BY "Created" DESC"}</example>
+<example description="Update grouping">{"view_id": "abc123", "configure": "GROUP BY "Priority"; SHOW "Name", "Status""}</example>
+
+        Args:
+            view_id: The view to update. Accepts a view:// URI, a Notion URL with ?v= parameter, or a bare UUID.
+            configure: View configuration DSL string. Supports FILTER, SORT BY, GROUP BY, CALENDAR BY, TIMELINE BY, SHOW, HIDE, COVER, WRAP CELLS, FREEZE COLUMNS, and CLEAR directives. See notion://docs/view-dsl-spec for full syntax.
+            name: New name for the view.
+
+        Returns:
+            Tool execution result
+
+        Tags:
+            notion, update, view
+        """
+        async with self._get_client() as client:
+            call_args = {}
+            call_args["view_id"] = view_id
+            if configure is not None:
+                call_args["configure"] = configure
+            if name is not None:
+                call_args["name"] = name
+            result = await client.call_tool("notion-update-view", call_args)
+            texts = []
+            for block in result.content:
+                if hasattr(block, "text"):
+                    texts.append(block.text)
+            text = "\n".join(texts)
+            try:
+                return json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                return {"result": text}
+
     def list_tools(self):
-        return [self.notion_search, self.notion_fetch, self.notion_create_pages, self.notion_update_page, self.notion_move_pages, self.notion_duplicate_page, self.notion_create_database, self.notion_update_data_source, self.notion_create_comment, self.notion_get_comments, self.notion_get_teams, self.notion_get_users]
+        return [self.notion_search, self.notion_fetch, self.notion_create_pages, self.notion_update_page, self.notion_move_pages, self.notion_duplicate_page, self.notion_create_database, self.notion_update_data_source, self.notion_create_comment, self.notion_get_comments, self.notion_get_teams, self.notion_get_users, self.notion_create_view, self.notion_update_view]

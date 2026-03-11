@@ -28,7 +28,8 @@ dependencies = [
     "jinja2>=3.1",
     "ruff>=0.15.4",
     "ty>=0.0.20",
-    "py-key-value-aio[disk]",
+    "py-key-value-aio[disk,filetree]",
+    "asyncclick>=8.3.0.3",
 ]
 
 [project.urls]

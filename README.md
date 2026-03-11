@@ -137,7 +137,7 @@ class ParallelApp:
         return [self.web_search_preview, self.fetch_url]
 ```
 
-Each method connects to the MCP server, calls the underlying tool, and returns parsed JSON. Auth credentials are persisted to disk (`~/.mcp-skill/<name>/`) after first use — provide once, reuse automatically.
+Each method connects to the MCP server, calls the underlying tool, and returns parsed JSON. Auth credentials are persisted to `~/.mcp-skill/auth/` after first use — keyed by server URL, so credentials persist across restarts automatically.
 
 ## Who Is This For?
 
@@ -163,7 +163,8 @@ Tracked improvements based on real-world usage:
 - [x] **Generate `__init__.py`** — Skill directory is a proper Python package
 - [x] **Post-generation validation** — `ast.parse` → `ruff check` → `ty check` with `uvx` fallback
 - [x] **Package-style imports** — Moved `app.py` to skill root; import via `from <skill>.app import <Class>`
-- [x] **Persistent token storage** — Disk-backed credential storage at `~/.mcp-skill/<name>/`
+- [x] **Persistent token storage** — FileTree-backed credential storage at `~/.mcp-skill/auth/`, keyed by server URL
 - [x] **Unified auth signature** — All auth types use `auth=None` in `__init__`
 - [x] **Sanitize skill names** — Hyphens/dots converted to underscores for valid Python identifiers
+- [x] **Async CLI** — CLI commands are fully async via `asyncclick`
 - [ ] **Support MCP resources and prompts** — Currently only tools are introspected and generated

@@ -1,10 +1,9 @@
 """MCP server connection and tool discovery."""
-from pathlib import Path
-
 from fastmcp import Client
-from fastmcp.client.auth import OAuth
 from fastmcp.client.transports import StreamableHttpTransport
-from key_value.aio.stores.disk import DiskStore
+
+from mcp_skill.auth import OAuth
+from mcp_skill.type_mapper import extract_server_name_from_url
 
 
 async def connect_and_list_tools(
@@ -13,18 +12,18 @@ async def connect_and_list_tools(
     headers: dict[str, str] | None = None,
 ) -> tuple[str, list]:
     """Connect to an MCP server and list its tools.
-    
+
     Args:
         url: MCP server URL (HTTP/HTTPS)
         auth: Authentication - None for no auth, "oauth" for OAuth with
-              persistent disk-backed token storage, or a string for Bearer token
+              persistent FileTree-backed token storage, or a string for Bearer token
         headers: Custom headers dict (e.g. {"x-api-key": "..."}). When
                  provided, a StreamableHttpTransport is constructed directly
                  so that headers are sent on every request.
-    
+
     Returns:
         Tuple of (server_name, list_of_tools)
-    
+
     Raises:
         ConnectionError: If cannot connect to server
         RuntimeError: If auth fails or other error
@@ -34,32 +33,16 @@ async def connect_and_list_tools(
             transport = StreamableHttpTransport(url=url, headers=headers)
             client = Client(transport)
         elif auth and auth.lower() == "oauth":
-            token_storage = DiskStore(
-                directory=Path.home() / ".mcp-skill" / "oauth-tokens"
-            )
-            oauth = OAuth(token_storage=token_storage)
-            client = Client(url, auth=oauth)
+            client = Client(url, auth=OAuth())
         elif auth and auth.lower() not in ("none", ""):
             client = Client(url, auth=auth)
         else:
             client = Client(url)
-        
+
         async with client:
-            # Get tools list
             tools = await client.list_tools()
-            
-            # Try to derive server name from URL
-            from urllib.parse import urlparse
-            parsed = urlparse(url)
-            hostname = parsed.hostname or "unknown"
-            # Extract meaningful name from hostname
-            parts = hostname.split(".")
-            skip = {"www", "api", "mcp", "com", "org", "net", "io", "co", "dev", "app", "127", "0", "1", "localhost"}
-            candidates = [p for p in parts if p and p.lower() not in skip]
-            server_name = candidates[0] if candidates else (parts[0] if parts and parts[0] else "mcp-server")
-            
-            return (server_name, tools)
-    
+            return (extract_server_name_from_url(url), tools)
+
     except Exception as e:
         error_msg = str(e).lower()
         if "refused" in error_msg or "connect" in error_msg or "timeout" in error_msg:

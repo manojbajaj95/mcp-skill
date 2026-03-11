@@ -11,8 +11,8 @@ MCP skill for linear. Provides 31 tools: get_attachment, create_attachment, dele
 
 This MCP server uses **OAuth** authentication.
 The OAuth flow is handled automatically by the MCP client. Tokens are persisted
-to `~/.mcp-skill/linear/oauth-tokens/` so subsequent runs reuse the
-same credentials without re-authenticating.
+to `~/.mcp-skill/auth/` so subsequent runs reuse the same credentials without
+re-authenticating.
 
 ```python
 app = LinearApp()  # uses default OAuth flow

@@ -178,6 +178,21 @@ def derive_skill_name(server_name: str) -> str:
     return name
 
 
+_HOSTNAME_SKIP = {"www", "api", "mcp", "com", "org", "net", "io", "co", "dev", "app", "127", "0", "1", "localhost"}
+
+
+def extract_server_name_from_url(url: str) -> str:
+    """Extract a raw server name from a URL hostname."""
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname or "unknown"
+        parts = hostname.split(".")
+        candidates = [p for p in parts if p and p.lower() not in _HOSTNAME_SKIP]
+        return candidates[0] if candidates else (parts[0] if parts and parts[0] else "mcp-server")
+    except Exception:
+        return "mcp-server"
+
+
 def derive_skill_name_from_url(url: str) -> str:
     """Derive a skill name from an MCP server URL."""
     try:
