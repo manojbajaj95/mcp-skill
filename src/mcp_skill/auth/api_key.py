@@ -1,8 +1,8 @@
 """Custom header API key authentication with persistent disk-backed storage."""
-from pathlib import Path
 
 import httpx
-from key_value.aio.stores.disk import DiskStore
+
+from .storage import get_default_token_storage
 
 
 class ApiKeyAuth(httpx.Auth):
@@ -21,9 +21,7 @@ class ApiKeyAuth(httpx.Auth):
         self._api_key = api_key
         self._skill_name = skill_name
         self._header_name = header_name
-        self._token_storage = DiskStore(
-            directory=Path.home() / ".mcp-skill" / skill_name / "api-tokens"
-        )
+        self._token_storage = get_default_token_storage(skill_name)
         self._resolved_key: str | None = None
 
     async def async_auth_flow(self, request: httpx.Request):
@@ -36,10 +34,14 @@ class ApiKeyAuth(httpx.Auth):
                 if stored:
                     self._resolved_key = stored
                 else:
-                    raise ValueError(
-                        "No API key provided and none found in storage at "
-                        f"~/.mcp-skill/{self._skill_name}/api-tokens/. "
-                        "Pass auth= on first use to persist it."
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    entered = await loop.run_in_executor(
+                        None, lambda: input(f"API Key for {self._skill_name}: ")
                     )
+                    if not entered:
+                        raise ValueError("No API key provided.")
+                    await self._token_storage.put(key="api-key", value=entered)
+                    self._resolved_key = entered
         request.headers[self._header_name] = self._resolved_key
         yield request

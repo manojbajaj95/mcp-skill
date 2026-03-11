@@ -1,8 +1,7 @@
 """Bearer token authentication with persistent disk-backed storage."""
-from pathlib import Path
-
 import httpx
-from key_value.aio.stores.disk import DiskStore
+
+from .storage import get_default_token_storage
 
 
 class BearerAuth(httpx.Auth):
@@ -15,9 +14,7 @@ class BearerAuth(httpx.Auth):
     def __init__(self, api_key: str | None = None, skill_name: str = "default"):
         self._api_key = api_key
         self._skill_name = skill_name
-        self._token_storage = DiskStore(
-            directory=Path.home() / ".mcp-skill" / skill_name / "api-tokens"
-        )
+        self._token_storage = get_default_token_storage(skill_name)
         self._resolved_key: str | None = None
 
     async def async_auth_flow(self, request: httpx.Request):

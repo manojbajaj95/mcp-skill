@@ -1,5 +1,6 @@
 """JSON Schema to Python type string conversion."""
 from typing import Any
+from urllib.parse import urlparse
 import re
 import keyword
 
@@ -175,6 +176,24 @@ def derive_skill_name(server_name: str) -> str:
         return "mcp-skill"
     
     return name
+
+
+def derive_skill_name_from_url(url: str) -> str:
+    """Derive a skill name from an MCP server URL."""
+    try:
+        parsed = urlparse(url)
+        # Use the hostname, stripping common prefixes like "api." or "mcp."
+        host = parsed.hostname or ""
+        host = re.sub(r"^(api|mcp|www)\.", "", host)
+        # Strip TLD (last segment)
+        parts = host.split(".")
+        base = parts[0] if parts else host
+        if parsed.path and parsed.path.strip("/"):
+            path_segment = parsed.path.strip("/").split("/")[0]
+            base = f"{base}-{path_segment}"
+        return derive_skill_name(base)
+    except Exception:
+        return "mcp-skill"
 
 
 def generate_skill_description(server_name: str, tools: list) -> str:

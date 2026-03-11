@@ -1,4 +1,5 @@
 """CLI entry point for mcp-skill."""
+
 import asyncio
 import os
 import sys
@@ -9,7 +10,13 @@ from pathlib import Path
 
 from mcp_skill.introspector import connect_and_list_tools
 from mcp_skill.generator import generate_app_py, generate_skill_md
-from mcp_skill.type_mapper import derive_class_name, derive_module_name, derive_skill_name, generate_skill_description
+from mcp_skill.type_mapper import (
+    derive_class_name,
+    derive_module_name,
+    derive_skill_name,
+    derive_skill_name_from_url,
+    generate_skill_description,
+)
 from mcp_skill.validator import validate_generated_code
 
 
@@ -20,37 +27,83 @@ def main():
 
 @main.command()
 @click.option("--url", help="MCP server URL")
-@click.option("--auth", type=click.Choice(["none", "api-key", "oauth"]), default="none", help="Authentication type")
+@click.option(
+    "--auth",
+    type=click.Choice(["none", "api-key", "oauth"]),
+    default="none",
+    help="Authentication type",
+)
 @click.option("--name", help="Skill name (auto-detected if not provided)")
 @click.option("--api-key", "api_key", help="API key (when auth=api-key)")
-@click.option("--auth-header", "auth_header", default=None, help="Header name for API key (e.g. 'x-api-key'). Omit for Bearer token.")
+@click.option(
+    "--auth-header",
+    "auth_header",
+    default=None,
+    help="Header name for API key (e.g. 'x-api-key'). Omit for Bearer token.",
+)
 @click.option("--force", is_flag=True, help="Overwrite existing directory")
 @click.option("--non-interactive", is_flag=True, help="Skip interactive prompts")
-@click.option("--app-name", "app_name", default=None, help="App class base name (e.g. 'Fetch' → FetchApp)")
+@click.option(
+    "--app-name",
+    "app_name",
+    default=None,
+    help="App class base name (e.g. 'Fetch' → FetchApp)",
+)
 def create(url, auth, name, api_key, auth_header, force, non_interactive, app_name):
     """Create an Agent Skill from an MCP server."""
+    # Generation order:
+    # 1. Ask/resolve URL
+    # 2. Derive and confirm skill name from URL
+    # 3. Derive and confirm app name from skill name
+    # 4. Resolve auth type (using skill name for token storage)
+    # 5. Connect and list tools
+    # 6. Generate app.py and skill.md
+    # 7. Run validation on generated code
     try:
-        # Gather inputs - interactive or from flags
+        # Step 1: Resolve URL
         if non_interactive:
             if not url:
                 click.echo("Error: --url is required in non-interactive mode", err=True)
                 sys.exit(1)
         else:
-            # Interactive prompts
             if not url:
                 url = click.prompt("MCP Server URL")
-            if auth == "none":
-                auth_choice = click.prompt(
-                    "Authentication type",
-                    type=click.Choice(["none", "api-key", "oauth"]),
-                    default="none",
-                )
-                auth = auth_choice
 
-        # Get API key if needed
+        # Step 2: Derive and confirm skill name from URL
+        url_derived_name = derive_skill_name_from_url(url)
+        if not name:
+            if non_interactive:
+                name = url_derived_name
+            else:
+                name = click.prompt("Skill name", default=url_derived_name)
+        else:
+            name = derive_skill_name(name)
+
+        # Step 3: Derive and confirm app name from skill name
+        if not app_name:
+            default_app = name.replace("-", " ").title().replace(" ", "")
+            if non_interactive:
+                app_name = default_app
+            else:
+                app_name = click.prompt(
+                    "App name (base name, 'App' suffix added automatically)",
+                    default=default_app,
+                )
+
+        # Step 4: Resolve auth type, using skill name for token storage
+        if not non_interactive and auth == "none":
+            auth = click.prompt(
+                "Authentication type",
+                type=click.Choice(["none", "api-key", "oauth"]),
+                default="none",
+            )
+
         if auth == "api-key" and not api_key:
             if non_interactive:
-                click.echo("Error: --api-key is required when auth=api-key in non-interactive mode", err=True)
+                click.echo(
+                    "Error: --api-key is required when auth=api-key in non-interactive mode",
+                    err=True,
+                )
                 sys.exit(1)
             api_key = click.prompt("API Key", hide_input=True)
 
@@ -69,6 +122,7 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
         else:
             auth_type = "none"
 
+        # Step 5: Connect and list tools
         click.echo(f"Connecting to {url}...")
         try:
             server_name, tools = asyncio.run(
@@ -86,30 +140,15 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
         if not tools:
             click.echo("Warning: Server has 0 tools. Generating minimal skill.")
 
-        # Determine skill name
-        if not name:
-            default_name = derive_skill_name(server_name)
-            if non_interactive:
-                name = default_name
-            else:
-                name = click.prompt("Skill name", default=default_name)
-        else:
-            name = derive_skill_name(name)
-
-        # Determine app class name
-        if not app_name:
-            if non_interactive:
-                app_name = server_name
-            else:
-                default_app = server_name.capitalize()
-                app_name = click.prompt("App name (base name, 'App' suffix added automatically)", default=default_app)
-
         module_name = derive_module_name(name)
         output_dir = os.path.join(".agents", "skills", module_name)
         if os.path.exists(output_dir):
             if not force:
                 if non_interactive:
-                    click.echo(f"Error: Directory '{output_dir}' already exists. Use --force to overwrite.", err=True)
+                    click.echo(
+                        f"Error: Directory '{output_dir}' already exists. Use --force to overwrite.",
+                        err=True,
+                    )
                     sys.exit(1)
                 if not click.confirm(f"Directory '{output_dir}' exists. Overwrite?"):
                     click.echo("Aborted.")
@@ -122,13 +161,21 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
         click.echo("Generating skill...")
 
         app_code = generate_app_py(
-            class_name, url, tools,
-            auth_type=auth_type, auth_header=auth_header,
-            skill_name=name, module_name=module_name,
+            class_name,
+            url,
+            tools,
+            auth_type=auth_type,
+            auth_header=auth_header,
+            skill_name=name,
+            module_name=module_name,
         )
         skill_md = generate_skill_md(
-            name, description, tools, class_name,
-            auth_type=auth_type, auth_header=auth_header,
+            name,
+            description,
+            tools,
+            class_name,
+            auth_type=auth_type,
+            auth_header=auth_header,
             module_name=module_name,
         )
 
@@ -149,7 +196,10 @@ def create(url, auth, name, api_key, auth_header, force, non_interactive, app_na
         click.echo(report.summary())
 
         if not report.passed:
-            click.echo("\nWarning: Validation found issues. The skill was still generated but may need fixes.", err=True)
+            click.echo(
+                "\nWarning: Validation found issues. The skill was still generated but may need fixes.",
+                err=True,
+            )
 
         click.echo(f"\nSkill generated at ./{output_dir}/")
         click.echo(f"  {output_dir}/app.py")
