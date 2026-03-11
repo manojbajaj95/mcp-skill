@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/manojbajaj95/mcp-skill/compare/v0.2.0...v0.3.0) (2026-03-11)
+
+
+### Features
+
+* add project scaffolding, regen script, and refresh generated skills ([3007b60](https://github.com/manojbajaj95/mcp-skill/commit/3007b602fd2a8e6d642c745463e435d79b0d819b))
+
 ## [0.2.0](https://github.com/manojbajaj95/mcp-skill/compare/v0.1.0...v0.2.0) (2026-03-11)
 
 
