@@ -157,6 +157,7 @@ def generate_skill_md(
     auth_type: str = "none",
     auth_header: str | None = None,
     module_name: str | None = None,
+    short_description: str | None = None,
 ) -> str:
     if len(description) > 1024:
         description = description[:1021] + "..."
@@ -169,6 +170,7 @@ def generate_skill_md(
         skill_name=skill_name,
         module_name=module_name or skill_name,
         description=description,
+        short_description=short_description or skill_name,
         class_name=class_name,
         auth_type=auth_type,
         auth_header=auth_header,

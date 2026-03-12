@@ -1,6 +1,8 @@
 ---
 name: {{ skill_name }}
 description: "{{ description | replace('"', '\\"') }}"
+metadata:
+  short-description: "{{ short_description | replace('"', '\\"') }}"
 ---
 
 # {{ skill_name }}
@@ -45,16 +47,15 @@ app = {{ class_name }}()
 
 The key is sent as `{{ auth_header }}: <auth>` on every request.
 {% elif auth_type == "oauth" %}
-This MCP server uses **OAuth** authentication.
-The OAuth flow is handled automatically by the MCP client. Tokens are persisted
-to `~/.mcp-skill/auth/` so subsequent runs reuse the same credentials without
-re-authenticating.
+This app can use the MCP client's built-in OAuth flow when the server requires it.
+In most cases, the default constructor is enough. Tokens are persisted to
+`~/.mcp-skill/auth/` so subsequent runs reuse the same credentials automatically.
 
 ```python
-app = {{ class_name }}()  # uses default OAuth flow
+app = {{ class_name }}()
 ```
 
-To bring your own OAuth provider, pass it via the `auth` argument:
+If you need a custom OAuth provider, pass it via the `auth` argument:
 
 ```python
 app = {{ class_name }}(auth=my_oauth_provider)
@@ -79,7 +80,44 @@ Or with pip:
 pip install mcp-skill
 ```
 
-## How to Run
+## Python Usage
+
+Use the generated app directly in async Python code:
+
+```python
+import asyncio
+from {{ module_name }}.app import {{ class_name }}
+
+
+async def main():
+{% if auth_type in ('bearer', 'header') %}
+    app = {{ class_name }}(auth="YOUR_API_KEY")
+{% else %}
+    app = {{ class_name }}()
+{% endif %}
+    result = await app.{{ tools[0].safe_method if tools else 'list_tools' }}({{ tools[0].example_args if tools else '' }})
+    print(result)
+
+
+asyncio.run(main())
+```
+
+## Async Usage Notes
+
+- Every generated tool method is `async`, so call it with `await`.
+- Use these apps inside an async function, then run that function with `asyncio.run(...)` if you are in a script.
+- If you forget `await`, you will get a coroutine object instead of the actual tool result.
+- Be careful when mixing this with other event-loop environments such as notebooks, web servers, or async frameworks.
+
+## Discover Functions with the CLI
+
+Use the CLI to find available apps, list functions on an app, and inspect a function before calling it:
+
+```bash
+uvx mcp-skill list-apps
+uvx mcp-skill list-functions {{ module_name }}
+uvx mcp-skill inspect {{ module_name }} {{ tools[0].safe_method if tools else 'function_name' }}
+```
 
 **Important:** Add `.agents/skills` to your Python path so imports resolve correctly:
 
@@ -135,31 +173,3 @@ async def main():
 asyncio.run(main())
 "
 ```
-
-{% if tools %}
-## Available Tools
-
-{% for tool in tools %}
-### {{ tool.name }}
-
-{{ tool.description or "No description available." }}
-
-{% if tool.params %}
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-{% for p in tool.params %}
-| {{ p.name }} | `{{ p.type }}` | {{ "Yes" if p.required else "No" }} | {{ p.description }} |
-{% endfor %}
-
-{% endif %}
-**Example:**
-```python
-result = await app.{{ tool.safe_method }}({{ tool.example_args }})
-```
-
-{% endfor %}
-{% else %}
-## Available Tools
-
-No tools available.
-{% endif %}

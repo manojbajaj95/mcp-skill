@@ -1,24 +1,25 @@
 ---
 name: parallel-search
-description: "MCP skill for search-mcp. Provides 2 tools: web_search_preview, web_fetch"
+description: "Use this skill when you need to work with search-mcp through its generated async Python app, call its MCP-backed functions from code, or inspect available functions with the mcp-skill CLI."
+metadata:
+  short-description: "Use search-mcp from async Python"
 ---
 
 # parallel-search
 
-MCP skill for search-mcp. Provides 2 tools: web_search_preview, web_fetch
+Use this skill when you need to work with search-mcp through its generated async Python app, call its MCP-backed functions from code, or inspect available functions with the mcp-skill CLI.
 
 ## Authentication
 
-This MCP server uses **OAuth** authentication.
-The OAuth flow is handled automatically by the MCP client. Tokens are persisted
-to `~/.mcp-skill/auth/` so subsequent runs reuse the same credentials without
-re-authenticating.
+This app can use the MCP client's built-in OAuth flow when the server requires it.
+In most cases, the default constructor is enough. Tokens are persisted to
+`~/.mcp-skill/auth/` so subsequent runs reuse the same credentials automatically.
 
 ```python
-app = ParallelsearchApp()  # uses default OAuth flow
+app = ParallelsearchApp()
 ```
 
-To bring your own OAuth provider, pass it via the `auth` argument:
+If you need a custom OAuth provider, pass it via the `auth` argument:
 
 ```python
 app = ParallelsearchApp(auth=my_oauth_provider)
@@ -42,7 +43,40 @@ Or with pip:
 pip install mcp-skill
 ```
 
-## How to Run
+## Python Usage
+
+Use the generated app directly in async Python code:
+
+```python
+import asyncio
+from parallel_search.app import ParallelsearchApp
+
+
+async def main():
+    app = ParallelsearchApp()
+    result = await app.web_search_preview(objective="example", search_queries="value")
+    print(result)
+
+
+asyncio.run(main())
+```
+
+## Async Usage Notes
+
+- Every generated tool method is `async`, so call it with `await`.
+- Use these apps inside an async function, then run that function with `asyncio.run(...)` if you are in a script.
+- If you forget `await`, you will get a coroutine object instead of the actual tool result.
+- Be careful when mixing this with other event-loop environments such as notebooks, web servers, or async frameworks.
+
+## Discover Functions with the CLI
+
+Use the CLI to find available apps, list functions on an app, and inspect a function before calling it:
+
+```bash
+uvx mcp-skill list-apps
+uvx mcp-skill list-functions parallel_search
+uvx mcp-skill inspect parallel_search web_search_preview
+```
 
 **Important:** Add `.agents/skills` to your Python path so imports resolve correctly:
 
@@ -90,46 +124,3 @@ async def main():
 asyncio.run(main())
 "
 ```
-
-## Available Tools
-
-### web_search_preview
-
-Purpose: Perform web searches and return results in an LLM-friendly format and with parameters tuned for LLMs.
-
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| objective | `str` | Yes | Natural-language description of what the web search is trying to find.
-Try to make the search objective atomic, looking for a specific piece of information. May include guidance about preferred sources or freshness. |
-| search_queries | `list[str]` | Yes | (optional) List of keyword search queries of 1-6
- words, which may include search operators. The search queries should be related to the
- objective. Limited to 5 entries of 200 characters each. |
-
-**Example:**
-```python
-result = await app.web_search_preview(objective="example", search_queries="value")
-```
-
-### web_fetch
-
-Purpose: Fetch and extract relevant content from
-specific web URLs.
-
-Ideal Use Cases:
-- Extracting content from specific URLs you've already identified
-- Exploring URLs returned by a web search in greater depth
-
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| urls | `list[str]` | Yes | List of URLs to extract content from. Must be valid
-HTTP/HTTPS URLs. Maximum 10 URLs per request. |
-| objective | `str | None` | No | Natural-language description of what
-information you're looking for from the URLs. Limit to 200 characters. |
-
-**Example:**
-```python
-result = await app.web_fetch(urls="value", objective="example")
-```
-
