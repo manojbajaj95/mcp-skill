@@ -108,6 +108,16 @@ Best practices:
 - Keep the subject line short and imperative
 - Add a short body when the change needs extra context
 
+Optional local enforcement with `pre-commit`:
+
+```bash
+uv tool install pre-commit
+pre-commit install
+pre-commit install --hook-type commit-msg
+```
+
+This repo includes a `commit-msg` hook in `.pre-commit-config.yaml` that rejects non-conventional commit subjects before they are created.
+
 If release-please says a commit "could not be parsed", push a new conventional commit to `main` and rerun the workflow.
 
 ## Usage

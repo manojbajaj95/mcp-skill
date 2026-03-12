@@ -66,6 +66,7 @@ Skills land in `.agents/skills/<module_name>/` (excluded from git via `.gitignor
 - `type_mapper.py` is the canonical place for URL parsing utilities (see `extract_server_name_from_url`)
 - Pre-built example skills live in `skills/` (version-controlled); generated skills go to `.agents/skills/` (gitignored)
 - Always use Conventional Commits for any git commit created in this repo so `release-please` can parse it. Prefer subjects like `feat: add OAuth token refresh handling`, `fix: recover from stale cached auth`, or `chore: update release workflow docs`.
+- Keep `.pre-commit-config.yaml` aligned with that rule so local `commit-msg` hooks enforce the same Conventional Commit policy before push.
 
 ## Release
 
