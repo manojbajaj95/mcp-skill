@@ -83,6 +83,33 @@ uvx --from . mcp-skill create --url https://your-mcp-server.com/mcp --auth api-k
 
 Requires [uv](https://github.com/astral-sh/uv) and Python 3.10+.
 
+## Release Workflow
+
+Releases are managed by `release-please`, which only considers commits on `main` that follow the Conventional Commits format.
+
+Use commit subjects like:
+
+```text
+feat: add CLI command to inspect generated apps
+fix: handle auth recovery when cached credentials are stale
+chore: update release workflow docs
+```
+
+Version bump behavior:
+
+- `feat:` creates a minor release
+- `fix:` creates a patch release
+- `feat!:` or a `BREAKING CHANGE:` footer creates a major release
+
+Best practices:
+
+- Prefer squash merges so the PR title becomes the commit on `main`
+- Write PR titles in Conventional Commits format
+- Keep the subject line short and imperative
+- Add a short body when the change needs extra context
+
+If release-please says a commit "could not be parsed", push a new conventional commit to `main` and rerun the workflow.
+
 ## Usage
 
 ```bash
