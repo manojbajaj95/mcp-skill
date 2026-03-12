@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/manojbajaj95/mcp-skill/compare/v0.3.0...v0.3.1) (2026-03-12)
+
+
+### Bug Fixes
+
+* enforce conventional PR titles for release workflow ([0bc1345](https://github.com/manojbajaj95/mcp-skill/commit/0bc1345eec0c54de2a012531ab02539b19499eeb))
+
 ## [0.3.0](https://github.com/manojbajaj95/mcp-skill/compare/v0.2.0...v0.3.0) (2026-03-11)
 
 
