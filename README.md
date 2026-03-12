@@ -77,8 +77,8 @@ result = await app.web_search_preview(
 # Install with uv
 uv pip install -e .
 
-# Or use directly
-uv run mcp-skill create --url https://your-mcp-server.com/mcp --auth api-key
+# Or use directly without installing globally
+uvx --from . mcp-skill create --url https://your-mcp-server.com/mcp --auth api-key
 ```
 
 Requires [uv](https://github.com/astral-sh/uv) and Python 3.10+.
@@ -87,16 +87,51 @@ Requires [uv](https://github.com/astral-sh/uv) and Python 3.10+.
 
 ```bash
 # Interactive mode — prompts for URL, auth type, etc.
-mcp-skill create
+uvx --from . mcp-skill create
 
 # Non-interactive mode
-mcp-skill create \
+uvx --from . mcp-skill create \
   --url https://search-mcp.parallel.ai/mcp \
   --auth api-key \
   --api-key YOUR_KEY \
   --name parallel-search \
   --non-interactive
 ```
+
+### Discover Existing Apps
+
+Use the CLI as a local catalog for both version-controlled `skills/` apps and generated `.agents/skills/` apps.
+
+```bash
+# List every discovered app
+uvx --from . mcp-skill list-apps
+
+# List callable functions for a specific app
+uvx --from . mcp-skill list-functions notion
+
+# Inspect a specific function's signature and docstring
+uvx --from . mcp-skill inspect notion notion_search
+```
+
+### Use an App in Python
+
+Once you find the app and method you need, call it from async Python:
+
+```python
+import asyncio
+from sentry.app import SentryApp
+
+
+async def main():
+    sentry = SentryApp()
+    user = await sentry.whoami()
+    print(user)
+
+
+asyncio.run(main())
+```
+
+All generated tool wrappers are `async`. Use them carefully with `await` inside an async function. If you skip `await`, you will get a coroutine object instead of the actual result.
 
 ### Generated Output
 
@@ -167,4 +202,5 @@ Tracked improvements based on real-world usage:
 - [x] **Unified auth signature** — All auth types use `auth=None` in `__init__`
 - [x] **Sanitize skill names** — Hyphens/dots converted to underscores for valid Python identifiers
 - [x] **Async CLI** — CLI commands are fully async via `asyncclick`
+- [x] **Local app discovery** — `mcp-skill list-apps`, `mcp-skill list-functions <app>`, and `mcp-skill inspect <app> <function>`
 - [ ] **Support MCP resources and prompts** — Currently only tools are introspected and generated

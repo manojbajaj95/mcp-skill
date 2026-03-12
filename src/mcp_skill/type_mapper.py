@@ -212,33 +212,28 @@ def derive_skill_name_from_url(url: str) -> str:
 
 
 def generate_skill_description(server_name: str, tools: list) -> str:
-    """Generate a description for the skill."""
-    if not tools:
-        return f"MCP skill for {server_name}. No tools available."
-    
-    tool_names = [tool.name for tool in tools]
-    tool_count = len(tool_names)
-    
-    base = f"MCP skill for {server_name}. Provides {tool_count} tools: "
-    tools_str = ", ".join(tool_names)
-    full_desc = base + tools_str
-    
-    if len(full_desc) > 1024:
-        max_tools_len = 1024 - len(base) - 3
-        if max_tools_len <= 0:
-            return full_desc[:1021] + "..."
-        
-        tools_list = []
-        current_len = 0
-        for name in tool_names:
-            sep_len = 2 if tools_list else 0
-            if current_len + sep_len + len(name) <= max_tools_len:
-                tools_list.append(name)
-                current_len += sep_len + len(name)
-            else:
-                break
-        
-        tools_str = ", ".join(tools_list) + "..."
-        full_desc = base + tools_str
-    
-    return full_desc
+    """Generate a concise, trigger-oriented description for the skill."""
+
+    display_name = (server_name or "this service").strip()
+    if not display_name:
+        display_name = "this service"
+
+    if tools:
+        return (
+            f"Use this skill when you need to work with {display_name} through its "
+            "generated async Python app, call its MCP-backed functions from code, "
+            "or inspect available functions with the mcp-skill CLI."
+        )
+
+    return (
+        f"Use this skill when you need to work with {display_name} through its "
+        "generated async Python app or inspect the generated wrapper with the "
+        "mcp-skill CLI."
+    )
+
+
+def generate_skill_short_description(server_name: str) -> str:
+    """Generate a short human-facing description for skill metadata."""
+
+    display_name = (server_name or "MCP service").strip() or "MCP service"
+    return f"Use {display_name} from async Python"

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import asyncclick as click
 
+from mcp_skill.catalog import discover_apps, find_method, get_app
 from mcp_skill.introspector import connect_and_list_tools
 from mcp_skill.generator import generate_app_py, generate_skill_md
 from mcp_skill.type_mapper import (
@@ -14,6 +15,7 @@ from mcp_skill.type_mapper import (
     derive_skill_name,
     derive_skill_name_from_url,
     generate_skill_description,
+    generate_skill_short_description,
 )
 from mcp_skill.validator import validate_generated_code
 
@@ -21,6 +23,76 @@ from mcp_skill.validator import validate_generated_code
 @click.group()
 async def main():
     """Convert any MCP server into an Agent Skill."""
+
+
+@main.command(name="list-apps")
+async def list_apps():
+    """List all discovered apps."""
+
+    apps = discover_apps()
+    if not apps:
+        click.echo("No app.py classes found in skills/ or .agents/skills/.", err=True)
+        sys.exit(1)
+
+    click.echo("Listing apps")
+    click.echo(f"Apps found: {len(apps)}")
+    click.echo("")
+    for app in sorted(apps.values(), key=lambda item: item.name):
+        click.echo(
+            f"  - {app.name}: {app.class_name} "
+            f"({len(app.methods)} functions, {app.source_label})"
+        )
+
+
+@main.command(name="list-functions")
+@click.argument("app_name")
+async def list_functions(app_name):
+    """List functions for a specific app."""
+
+    app = get_app(app_name)
+    if app is None:
+        click.echo(f"Error: App '{app_name}' not found.", err=True)
+        sys.exit(1)
+
+    click.echo(f"Listing functions for app: {app.name}")
+    click.echo(f"Class: {app.class_name}")
+    click.echo(f"Path: {app.app_path}")
+    click.echo(f"Matched app: {app.name}")
+    click.echo(f"Functions found: {len(app.methods)}")
+    click.echo("")
+    for method in app.methods:
+        summary = method.docstring.strip().splitlines()[0]
+        click.echo(f"  - {method.signature}")
+        click.echo(f"    {summary}")
+
+
+@main.command()
+@click.argument("app_name")
+@click.argument("function_name")
+async def inspect(app_name, function_name):
+    """Inspect a function on a discovered app."""
+
+    app = get_app(app_name)
+    if app is None:
+        click.echo(f"Error: App '{app_name}' not found.", err=True)
+        sys.exit(1)
+
+    method = find_method(app, function_name)
+    if method is None:
+        click.echo(
+            f"Error: Function '{function_name}' not found in app '{app.name}'.",
+            err=True,
+        )
+        sys.exit(1)
+
+    click.echo(f"App: {app.name}")
+    click.echo(f"Class: {app.class_name}")
+    click.echo(f"Path: {app.app_path}:{method.line}")
+    click.echo(f"Function: {method.name}")
+    click.echo(f"Signature: {method.signature}")
+    click.echo("")
+    click.echo("Description:")
+    click.echo(method.docstring.strip())
 
 
 @main.command()
@@ -157,6 +229,7 @@ async def create(
         # Generate class name and description
         class_name = derive_class_name(app_name)
         description = generate_skill_description(server_name, tools)
+        short_description = generate_skill_short_description(server_name)
 
         click.echo("Generating skill...")
 
@@ -177,6 +250,7 @@ async def create(
             auth_type=auth_type,
             auth_header=auth_header,
             module_name=module_name,
+            short_description=short_description,
         )
 
         output_dir.mkdir(parents=True, exist_ok=True)
