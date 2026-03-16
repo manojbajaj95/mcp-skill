@@ -223,15 +223,6 @@ async def create(
             if oauth_client_id == "":
                 oauth_client_id = None
 
-            if oauth_client_metadata_url is None:
-                oauth_client_metadata_url = await click.prompt(
-                    "OAuth client metadata URL (optional)",
-                    default="",
-                    show_default=False,
-                )
-            if oauth_client_metadata_url == "":
-                oauth_client_metadata_url = None
-
             if oauth_scopes is None:
                 oauth_scopes = await click.prompt(
                     "OAuth scopes (optional, space-separated)",
@@ -250,6 +241,15 @@ async def create(
                 )
             if oauth_client_secret == "":
                 oauth_client_secret = None
+
+            if oauth_client_id and oauth_client_metadata_url is None:
+                oauth_client_metadata_url = await click.prompt(
+                    "OAuth client metadata URL (optional)",
+                    default="",
+                    show_default=False,
+                )
+            if oauth_client_metadata_url == "":
+                oauth_client_metadata_url = None
 
         auth_str = None
         headers: dict[str, str] | None = None
