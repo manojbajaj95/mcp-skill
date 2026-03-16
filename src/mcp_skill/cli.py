@@ -106,6 +106,30 @@ async def inspect(app_name, function_name):
 @click.option("--name", help="Skill name (auto-detected if not provided)")
 @click.option("--api-key", "api_key", help="API key (when auth=api-key)")
 @click.option(
+    "--oauth-client-id",
+    "oauth_client_id",
+    default=None,
+    help="Pre-registered OAuth client ID for PKCE/public-client flows",
+)
+@click.option(
+    "--oauth-client-secret",
+    "oauth_client_secret",
+    default=None,
+    help="Optional OAuth client secret for static clients",
+)
+@click.option(
+    "--oauth-scopes",
+    "oauth_scopes",
+    default=None,
+    help="Optional space-separated OAuth scopes",
+)
+@click.option(
+    "--oauth-client-metadata-url",
+    "oauth_client_metadata_url",
+    default=None,
+    help="Optional hosted client metadata URL to use instead of dynamic client registration",
+)
+@click.option(
     "--auth-header",
     "auth_header",
     default=None,
@@ -120,7 +144,18 @@ async def inspect(app_name, function_name):
     help="App class base name (e.g. 'Fetch' → FetchApp)",
 )
 async def create(
-    url, auth, name, api_key, auth_header, force, non_interactive, app_name
+    url,
+    auth,
+    name,
+    api_key,
+    oauth_client_id,
+    oauth_client_secret,
+    oauth_scopes,
+    oauth_client_metadata_url,
+    auth_header,
+    force,
+    non_interactive,
+    app_name,
 ):
     """Create an Agent Skill from an MCP server."""
     # Generation order:
@@ -178,6 +213,43 @@ async def create(
                 )
                 sys.exit(1)
             api_key = await click.prompt("API Key", hide_input=True)
+        elif auth == "oauth" and not non_interactive:
+            if oauth_client_id is None:
+                oauth_client_id = await click.prompt(
+                    "OAuth client ID (leave blank to use dynamic client registration)",
+                    default="",
+                    show_default=False,
+                )
+            if oauth_client_id == "":
+                oauth_client_id = None
+
+            if oauth_client_metadata_url is None:
+                oauth_client_metadata_url = await click.prompt(
+                    "OAuth client metadata URL (optional)",
+                    default="",
+                    show_default=False,
+                )
+            if oauth_client_metadata_url == "":
+                oauth_client_metadata_url = None
+
+            if oauth_scopes is None:
+                oauth_scopes = await click.prompt(
+                    "OAuth scopes (optional, space-separated)",
+                    default="",
+                    show_default=False,
+                )
+            if oauth_scopes == "":
+                oauth_scopes = None
+
+            if oauth_client_id and oauth_client_secret is None:
+                oauth_client_secret = await click.prompt(
+                    "OAuth client secret (optional)",
+                    default="",
+                    hide_input=True,
+                    show_default=False,
+                )
+            if oauth_client_secret == "":
+                oauth_client_secret = None
 
         auth_str = None
         headers: dict[str, str] | None = None
@@ -198,7 +270,13 @@ async def create(
         click.echo(f"Connecting to {url}...")
         try:
             server_name, tools = await connect_and_list_tools(
-                url, auth_str, headers=headers
+                url,
+                auth_str,
+                headers=headers,
+                oauth_client_id=oauth_client_id,
+                oauth_client_secret=oauth_client_secret,
+                oauth_scopes=oauth_scopes,
+                oauth_client_metadata_url=oauth_client_metadata_url,
             )
         except (ConnectionError, RuntimeError) as e:
             click.echo(f"Error: {e}", err=True)
@@ -239,6 +317,9 @@ async def create(
             tools,
             auth_type=auth_type,
             auth_header=auth_header,
+            oauth_client_id=oauth_client_id,
+            oauth_scopes=oauth_scopes,
+            oauth_client_metadata_url=oauth_client_metadata_url,
             skill_name=name,
             module_name=module_name,
         )
@@ -249,6 +330,9 @@ async def create(
             class_name,
             auth_type=auth_type,
             auth_header=auth_header,
+            oauth_client_id=oauth_client_id,
+            oauth_scopes=oauth_scopes,
+            oauth_client_metadata_url=oauth_client_metadata_url,
             module_name=module_name,
             short_description=short_description,
         )

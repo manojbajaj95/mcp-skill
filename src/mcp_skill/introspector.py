@@ -10,6 +10,10 @@ async def connect_and_list_tools(
     url: str,
     auth: str | None = None,
     headers: dict[str, str] | None = None,
+    oauth_client_id: str | None = None,
+    oauth_client_secret: str | None = None,
+    oauth_scopes: str | list[str] | None = None,
+    oauth_client_metadata_url: str | None = None,
 ) -> tuple[str, list]:
     """Connect to an MCP server and list its tools.
 
@@ -20,6 +24,11 @@ async def connect_and_list_tools(
         headers: Custom headers dict (e.g. {"x-api-key": "..."}). When
                  provided, a StreamableHttpTransport is constructed directly
                  so that headers are sent on every request.
+        oauth_client_id: Pre-registered OAuth client ID for PKCE/public-client flows.
+        oauth_client_secret: Optional OAuth client secret for static clients.
+        oauth_scopes: Optional OAuth scopes to request.
+        oauth_client_metadata_url: Optional client metadata document URL used
+            instead of dynamic client registration.
 
     Returns:
         Tuple of (server_name, list_of_tools)
@@ -33,7 +42,15 @@ async def connect_and_list_tools(
             transport = StreamableHttpTransport(url=url, headers=headers)
             client = Client(transport)
         elif auth and auth.lower() == "oauth":
-            client = Client(url, auth=OAuth())
+            client = Client(
+                url,
+                auth=OAuth(
+                    client_id=oauth_client_id,
+                    client_secret=oauth_client_secret,
+                    scopes=oauth_scopes,
+                    client_metadata_url=oauth_client_metadata_url,
+                ),
+            )
         elif auth and auth.lower() not in ("none", ""):
             client = Client(url, auth=auth)
         else:

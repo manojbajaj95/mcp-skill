@@ -221,7 +221,7 @@ Developers building:
 
 ## Current Limitations
 
-- **Auth**: Supports API key (Bearer or custom header), OAuth, and none — no mTLS or complex auth flows
+- **Auth**: Supports API key (Bearer or custom header), OAuth (including PKCE with either dynamic client registration or pre-registered `client_id`), and none — no mTLS
 - **Runtime dependency**: Generated code depends on [fastmcp](https://github.com/jlowin/fastmcp) for MCP client connections
 - **Connection per call**: Each method creates a new MCP client connection (no pooling)
 - **Tools only**: MCP resources and prompts not yet supported

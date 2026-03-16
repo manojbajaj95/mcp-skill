@@ -47,15 +47,34 @@ app = {{ class_name }}()
 
 The key is sent as `{{ auth_header }}: <auth>` on every request.
 {% elif auth_type == "oauth" %}
-This app can use the MCP client's built-in OAuth flow when the server requires it.
-In most cases, the default constructor is enough. Tokens are persisted to
-`~/.mcp-skill/auth/` so subsequent runs reuse the same credentials automatically.
+This app uses the MCP client's built-in OAuth 2.1 Authorization Code + PKCE flow.
+By default, FastMCP uses dynamic client registration when the server supports it.
+Tokens are persisted to `~/.mcp-skill/auth/` so subsequent runs reuse the same
+credentials automatically.
 
 ```python
 app = {{ class_name }}()
 ```
 
-If you need a custom OAuth provider, pass it via the `auth` argument:
+If your provider requires a pre-registered OAuth client instead of dynamic
+client registration, pass the client details directly:
+
+```python
+app = {{ class_name }}(
+    oauth_client_id={{ oauth_client_id|tojson if oauth_client_id else '"YOUR_CLIENT_ID"' }},
+{% if oauth_scopes %}
+    oauth_scopes={{ oauth_scopes|tojson }},
+{% else %}
+    oauth_scopes="tweet.read users.read offline.access",
+{% endif %}
+)
+```
+
+`oauth_client_secret` is also supported for confidential clients, and
+`oauth_client_metadata_url` can be used when the provider expects a hosted
+client metadata document instead of dynamic registration.
+
+If you need full control, pass a custom FastMCP/OpenAuth provider via `auth`:
 
 ```python
 app = {{ class_name }}(auth=my_oauth_provider)

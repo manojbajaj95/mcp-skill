@@ -109,12 +109,19 @@ def _prepare_tool_docs(tools: list) -> list[dict]:
     return docs
 
 
+def _python_literal(value: Any) -> str:
+    return repr(value)
+
+
 def generate_app_py(
     class_name: str,
     server_url: str,
     tools: list,
     auth_type: str = "none",
     auth_header: str | None = None,
+    oauth_client_id: str | None = None,
+    oauth_scopes: str | list[str] | None = None,
+    oauth_client_metadata_url: str | None = None,
     skill_name: str | None = None,
     module_name: str | None = None,
 ) -> str:
@@ -135,6 +142,9 @@ def generate_app_py(
         server_url=server_url,
         auth_type=auth_type,
         auth_header=auth_header,
+        oauth_client_id_literal=_python_literal(oauth_client_id),
+        oauth_scopes_literal=_python_literal(oauth_scopes),
+        oauth_client_metadata_url_literal=_python_literal(oauth_client_metadata_url),
         skill_name=skill_name,
         module_name=module_name or skill_name,
         brief=brief,
@@ -156,6 +166,9 @@ def generate_skill_md(
     class_name: str = "App",
     auth_type: str = "none",
     auth_header: str | None = None,
+    oauth_client_id: str | None = None,
+    oauth_scopes: str | list[str] | None = None,
+    oauth_client_metadata_url: str | None = None,
     module_name: str | None = None,
     short_description: str | None = None,
 ) -> str:
@@ -174,6 +187,9 @@ def generate_skill_md(
         class_name=class_name,
         auth_type=auth_type,
         auth_header=auth_header,
+        oauth_client_id=oauth_client_id,
+        oauth_scopes=oauth_scopes,
+        oauth_client_metadata_url=oauth_client_metadata_url,
         tools=tool_docs,
         dependencies=dependencies,
     )
