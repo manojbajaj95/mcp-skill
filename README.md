@@ -61,6 +61,8 @@ MCP servers give agents access to tools, but every tool call round-trips through
 
 **mcp-skill** makes this possible by compiling any MCP server into a plain Python class. Each tool becomes a typed async method. The agent just writes Python.
 
+For a deeper explanation of why MCP vs. CLI is the wrong framing, see [MCP vs CLI is the Wrong Question](https://www.mbajaj.me/blog/mcp-vs-cli-is-wrong-question).
+
 ```python
 from parallel_search.app import ParallelApp
 
