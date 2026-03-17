@@ -10,15 +10,24 @@ run() {
   local url="$2"
   local auth="$3"
   local app_name="$4"
+  local api_key="${5:-}"
 
   echo ">>> Generating: $name"
-  uv run mcp-skill create \
+  local cmd=(
+    uv run mcp-skill create
     --url "$url" \
     --auth "$auth" \
     --name "$name" \
     --app-name "$app_name" \
     --non-interactive \
     --force
+  )
+
+  if [[ -n "$api_key" ]]; then
+    cmd+=(--api-key "$api_key")
+  fi
+
+  "${cmd[@]}"
   echo "<<< Done: $name"
   echo ""
 }
@@ -40,6 +49,7 @@ copy_generated_skill() {
 
 skills=(
   "airtable|https://mcp.airtable.com/mcp|oauth|Airtable"
+  "buffer|https://mcp.buffer.com/mcp|api-key|Buffer|${BUFFER_API_KEY:-}"
   "canva|https://mcp.canva.com/mcp|oauth|Canva"
   "clickup|https://mcp.clickup.com/mcp|oauth|Clickup"
   "context7|https://mcp.context7.com/mcp|none|Context7"
@@ -51,13 +61,19 @@ skills=(
 )
 
 for skill in "${skills[@]}"; do
-  IFS="|" read -r name url auth app_name <<< "$skill"
-  run "$name" "$url" "$auth" "$app_name"
+  IFS="|" read -r name url auth app_name api_key <<< "$skill"
+  if [[ -n "${SKILLS_FILTER:-}" && ",${SKILLS_FILTER}," != *",${name},"* ]]; then
+    continue
+  fi
+  run "$name" "$url" "$auth" "$app_name" "$api_key"
 done
 
 echo ">>> Copying regenerated app skills to $OUTPUT_DIR"
 for skill in "${skills[@]}"; do
   IFS="|" read -r name _ <<< "$skill"
+  if [[ -n "${SKILLS_FILTER:-}" && ",${SKILLS_FILTER}," != *",${name},"* ]]; then
+    continue
+  fi
   copy_generated_skill "$name"
 done
 

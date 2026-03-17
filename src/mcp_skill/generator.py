@@ -26,13 +26,18 @@ def _generate_tags(tool_name: str) -> str:
     return ", ".join(tags) if tags else tool_name
 
 
+def _optionalize_type(type_annotation: str) -> str:
+    """Ensure a type annotation accepts None."""
+    return type_annotation if "None" in type_annotation else f"{type_annotation} | None"
+
+
 def _build_method_signature(method_name: str, params: list[dict]) -> str:
     parts = ["self"]
     for p in params:
         if p["required"]:
             parts.append(f"{p['name']}: {p['type']}")
         else:
-            parts.append(f"{p['name']}: {p['type']} = None")
+            parts.append(f"{p['name']}: {_optionalize_type(p['type'])} = None")
     return ", ".join(parts)
 
 
