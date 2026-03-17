@@ -3,7 +3,7 @@ import asyncio
 
 import httpx
 
-from .storage import get_token_storage
+from .storage import get_token, get_token_storage, put_token
 
 
 class BearerAuth(httpx.Auth):
@@ -27,11 +27,11 @@ class BearerAuth(httpx.Auth):
 
         self._loaded_from_storage = False
         if self._api_key:
-            await self._token_storage.put(key=self._storage_key, value=self._api_key)
+            await put_token(self._token_storage, self._storage_key, self._api_key)
             self._resolved_key = self._api_key
             return self._resolved_key
 
-        stored = await self._token_storage.get(key=self._storage_key)
+        stored = await get_token(self._token_storage, self._storage_key)
         if stored:
             self._resolved_key = stored
             self._loaded_from_storage = True
@@ -43,7 +43,7 @@ class BearerAuth(httpx.Auth):
         )
         if not entered:
             raise ValueError("No API key provided.")
-        await self._token_storage.put(key=self._storage_key, value=entered)
+        await put_token(self._token_storage, self._storage_key, entered)
         self._resolved_key = entered
         return self._resolved_key
 

@@ -2,7 +2,7 @@
 
 import httpx
 
-from .storage import get_token_storage
+from .storage import get_token, get_token_storage, put_token
 
 
 class ClientCredentialsAuth(httpx.Auth):
@@ -32,7 +32,7 @@ class ClientCredentialsAuth(httpx.Auth):
         yield request
 
     async def _fetch_token(self) -> str:
-        cached = await self._token_storage.get(key=self._storage_key)
+        cached = await get_token(self._token_storage, self._storage_key)
         if cached:
             return cached
         async with httpx.AsyncClient() as client:
@@ -43,5 +43,5 @@ class ClientCredentialsAuth(httpx.Auth):
             })
             resp.raise_for_status()
             token = resp.json()["access_token"]
-            await self._token_storage.put(key=self._storage_key, value=token)
+            await put_token(self._token_storage, self._storage_key, token)
             return token
