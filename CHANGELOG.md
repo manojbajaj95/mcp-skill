@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.4.0](https://github.com/manojbajaj95/mcp-skill/compare/v0.3.1...v0.4.0) (2026-03-17)
+
+
+### Features
+
+* centralize auth storage and add buffer skill ([57c5483](https://github.com/manojbajaj95/mcp-skill/commit/57c54835f6f4b22abae31180f8d5f10617beeb00))
+* centralize auth storage and add buffer skill ([bfe8237](https://github.com/manojbajaj95/mcp-skill/commit/bfe823700f4518744ee5b416477d66f262e98db0))
+* support static OAuth PKCE clients ([2fa639d](https://github.com/manojbajaj95/mcp-skill/commit/2fa639d51b9828a1a2c0694130784da205a428f1))
+
+
+### Bug Fixes
+
+* skip static oauth prompts for dynamic registration ([cc0b5c3](https://github.com/manojbajaj95/mcp-skill/commit/cc0b5c3ae20e59b57d903a042ad6c9a2b65ad9f5))
+
+
+### Documentation
+
+* add blog post link to README ([9b0350c](https://github.com/manojbajaj95/mcp-skill/commit/9b0350cdeef8dbe9a139c58da27a6ccf21870d4b))
+* add blog post link to README ([fb6d4ff](https://github.com/manojbajaj95/mcp-skill/commit/fb6d4ff73a1d34bd314f87137b3f71b9074c2a75))
+
 ## [0.3.1](https://github.com/manojbajaj95/mcp-skill/compare/v0.3.0...v0.3.1) (2026-03-12)
 
 
