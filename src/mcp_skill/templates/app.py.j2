@@ -28,9 +28,21 @@ class {{ class_name }}:
         self._auth = ApiKeyAuth(api_key=auth, server_url=url, header_name="{{ auth_header }}")
 {% endif %}
 {% elif auth_type == "oauth" %}
-    def __init__(self, url: str = "{{ server_url }}", auth=None) -> None:
+    def __init__(
+        self,
+        url: str = "{{ server_url }}",
+        auth=None,
+        oauth_client_id: str | None = {{ oauth_client_id_literal }},
+        oauth_client_secret: str | None = None,
+        oauth_scopes: str | list[str] | None = {{ oauth_scopes_literal }},
+        oauth_client_metadata_url: str | None = {{ oauth_client_metadata_url_literal }},
+    ) -> None:
         self.url = url
         self._oauth_auth = auth
+        self._oauth_client_id = oauth_client_id
+        self._oauth_client_secret = oauth_client_secret
+        self._oauth_scopes = oauth_scopes
+        self._oauth_client_metadata_url = oauth_client_metadata_url
 {% else %}
     def __init__(self, url: str = "{{ server_url }}", auth=None) -> None:
         self.url = url
@@ -47,7 +59,12 @@ class {{ class_name }}:
         return Client(self.url, auth=self._auth)
 {% elif auth_type == "oauth" %}
     def _get_client(self) -> Client:
-        oauth = self._oauth_auth or OAuth()
+        oauth = self._oauth_auth or OAuth(
+            client_id=self._oauth_client_id,
+            client_secret=self._oauth_client_secret,
+            scopes=self._oauth_scopes,
+            client_metadata_url=self._oauth_client_metadata_url,
+        )
         return Client(self.url, auth=oauth)
 {% else %}
     def _get_client(self) -> Client:
