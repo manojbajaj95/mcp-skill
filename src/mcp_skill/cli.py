@@ -138,6 +138,14 @@ async def inspect(app_name, function_name):
 @click.option("--force", is_flag=True, help="Overwrite existing directory")
 @click.option("--non-interactive", is_flag=True, help="Skip interactive prompts")
 @click.option(
+    "--output-dir",
+    "output_dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=Path(".agents") / "skills",
+    show_default=True,
+    help="Base directory where the generated skill package will be written.",
+)
+@click.option(
     "--app-name",
     "app_name",
     default=None,
@@ -155,6 +163,7 @@ async def create(
     auth_header,
     force,
     non_interactive,
+    output_dir,
     app_name,
 ):
     """Create an Agent Skill from an MCP server."""
@@ -291,16 +300,19 @@ async def create(
             click.echo("Warning: Server has 0 tools. Generating minimal skill.")
 
         module_name = derive_module_name(name)
-        output_dir = Path(".agents") / "skills" / module_name
-        if output_dir.exists():
+        output_root = output_dir.expanduser()
+        skill_output_dir = output_root / module_name
+        if skill_output_dir.exists():
             if not force:
                 if non_interactive:
                     click.echo(
-                        f"Error: Directory '{output_dir}' already exists. Use --force to overwrite.",
+                        f"Error: Directory '{skill_output_dir}' already exists. Use --force to overwrite.",
                         err=True,
                     )
                     sys.exit(1)
-                if not click.confirm(f"Directory '{output_dir}' exists. Overwrite?"):
+                if not click.confirm(
+                    f"Directory '{skill_output_dir}' exists. Overwrite?"
+                ):
                     click.echo("Aborted.")
                     sys.exit(0)
 
@@ -337,15 +349,15 @@ async def create(
             short_description=short_description,
         )
 
-        output_dir.mkdir(parents=True, exist_ok=True)
+        skill_output_dir.mkdir(parents=True, exist_ok=True)
 
         await asyncio.gather(
-            asyncio.to_thread((output_dir / "__init__.py").write_text, ""),
-            asyncio.to_thread((output_dir / "app.py").write_text, app_code),
-            asyncio.to_thread((output_dir / "SKILL.md").write_text, skill_md),
+            asyncio.to_thread((skill_output_dir / "__init__.py").write_text, ""),
+            asyncio.to_thread((skill_output_dir / "app.py").write_text, app_code),
+            asyncio.to_thread((skill_output_dir / "SKILL.md").write_text, skill_md),
         )
 
-        app_py_path = output_dir / "app.py"
+        app_py_path = skill_output_dir / "app.py"
         click.echo("Validating generated code...")
         report = validate_generated_code(app_py_path)
         click.echo(report.summary())
@@ -356,9 +368,9 @@ async def create(
                 err=True,
             )
 
-        click.echo(f"\nSkill generated at ./{output_dir}/")
-        click.echo(f"  {output_dir}/app.py")
-        click.echo(f"  {output_dir}/SKILL.md")
+        click.echo(f"\nSkill generated at {skill_output_dir}/")
+        click.echo(f"  {skill_output_dir}/app.py")
+        click.echo(f"  {skill_output_dir}/SKILL.md")
 
     except Exception as e:
         click.echo(f"Error: {e}", err=True)

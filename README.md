@@ -135,6 +135,13 @@ uvx --from . mcp-skill create \
   --api-key YOUR_KEY \
   --name parallel-search \
   --non-interactive
+
+# Generate directly into the version-controlled skills/ directory
+uvx --from . mcp-skill create \
+  --url https://mcp.granola.ai/mcp \
+  --name granola \
+  --output-dir skills \
+  --non-interactive
 ```
 
 ### Discover Existing Apps
@@ -174,7 +181,8 @@ All generated tool wrappers are `async`. Use them carefully with `await` inside 
 
 ### Generated Output
 
-The skill lands in `.agents/skills/<name>/` as a Python package:
+By default, the skill lands in `.agents/skills/<name>/` as a Python package. Pass
+`--output-dir skills` when you want to generate a version-controlled built-in skill instead.
 
 ```
 .agents/skills/parallel_search/
