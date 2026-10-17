@@ -149,7 +149,7 @@ uv run --frozen mcp-skill create \
   --url https://search.parallel.ai/mcp \
   --auth none \
   --name parallel-free \
-  --app-name ParallelFree \
+  --app-name parallel-free \
   --non-interactive
 ```
 
