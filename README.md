@@ -137,6 +137,34 @@ uvx --from . mcp-skill create \
   --non-interactive
 ```
 
+### Generate a Keyless Parallel App
+
+[Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp) provides free web search and page fetching without an account or API key. Anonymous search uses Fast mode and has lower rate limits than authenticated access.
+
+From the repository root, use the locked development environment to generate a separate app with the anonymous endpoint and `--auth none`:
+
+```bash
+uv sync --frozen
+uv run --frozen mcp-skill create \
+  --url https://search.parallel.ai/mcp \
+  --auth none \
+  --name parallel-free \
+  --app-name parallel-free \
+  --non-interactive
+```
+
+This creates `.agents/skills/parallel_free/` with the `ParallelFreeApp` class. The distinct name keeps it separate from the bundled `skills/parallel_search/` OAuth example.
+
+Discover the current tools and inspect their arguments before calling them:
+
+```bash
+uv run --frozen mcp-skill list-functions parallel_free
+uv run --frozen mcp-skill inspect parallel_free web_search
+uv run --frozen mcp-skill inspect parallel_free web_fetch
+```
+
+Use `web_search` to find sources, then `web_fetch` to read URLs. Search queries must be a list of strings, such as `["Python 3.14 release highlights"]`. For Python imports, add `.agents/skills` to `PYTHONPATH` and use `from parallel_free.app import ParallelFreeApp`; call its methods with `await` as shown below.
+
 ### Discover Existing Apps
 
 Use the CLI as a local catalog for both version-controlled `skills/` apps and generated `.agents/skills/` apps.
